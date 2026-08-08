@@ -1,0 +1,26 @@
+"""Application configuration loaded from environment variables."""
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+WEBHOOK_BASE_URL = (
+    os.getenv("WEBHOOK_BASE_URL", "").strip()
+    or os.getenv("RENDER_EXTERNAL_URL", "").strip()
+).rstrip("/")
+WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN", "").strip()
+PORT = int(os.getenv("PORT", "10000"))
+TEMP_DIR = BASE_DIR / "temp"
+DATABASE_PATH = BASE_DIR / "reeldrop.db"
+
+MAX_DOWNLOADS_PER_HOUR = int(os.getenv("MAX_DOWNLOADS_PER_HOUR", "10"))
+MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
+MAX_TELEGRAM_FILE_SIZE_MB = int(os.getenv("MAX_TELEGRAM_FILE_SIZE_MB", "49"))
+MAX_TELEGRAM_FILE_SIZE_BYTES = MAX_TELEGRAM_FILE_SIZE_MB * 1024 * 1024
+TEMP_FILE_MAX_AGE_HOURS = int(os.getenv("TEMP_FILE_MAX_AGE_HOURS", "24"))

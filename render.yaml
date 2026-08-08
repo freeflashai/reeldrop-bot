@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: reeldrop-bot
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: WEBHOOK_SECRET_TOKEN
+        generateValue: true
+      - key: MAX_CONCURRENT_DOWNLOADS
+        value: "2"
