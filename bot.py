@@ -3,9 +3,9 @@
 import asyncio
 import logging
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, NetworkError, TelegramError
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 import config
 from database import Database, PLATFORMS
@@ -81,14 +81,15 @@ async def quality_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.effective_user:
+    message = update.effective_message
+    if not message or not update.effective_user:
         return
     user_id = update.effective_user.id
-    url = extract_url(" ".join(context.args))
+    url = context.user_data.pop("selected_url", None) or extract_url(" ".join(context.args))
     if not url or detect_platform(url) != "instagram" or not is_supported_instagram_url(url):
-        await update.message.reply_text("❌ Use: /audio <supported Instagram link>")
+        await message.reply_text("❌ Use: /audio <supported Instagram link>")
         return
-    status = await update.message.reply_text("🎵 Audio extract ho rahi hai...")
+    status = await message.reply_text("🎵 Audio extract ho rahi hai...")
     request_dir = None
     try:
         async with download_semaphore:
@@ -98,7 +99,7 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             raise ReelDownloadError("Telegram file size limit exceeded")
         await status.edit_text("📤 Telegram par upload ho rahi hai...")
         with result.path.open("rb") as audio_file:
-            await update.message.reply_audio(audio=audio_file, title=result.title or "Instagram Audio", caption="✅ Audio Download Complete\n\n🎵 ReelDrop", read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+            await message.reply_audio(audio=audio_file, title=result.title or "Instagram Audio", caption="✅ Audio Download Complete\n\n🎵 ReelDrop", read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
         await asyncio.to_thread(database.record_download, user_id, "success", "instagram", None, "free")
         try: await status.delete()
         except BadRequest: pass
@@ -143,17 +144,28 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.effective_user:
+    message = update.effective_message
+    if not message or not update.effective_user:
         return
     user_id = update.effective_user.id
-    url = extract_url(update.message.text or "")
+    url = context.user_data.pop("selected_url", None) or extract_url(message.text or "")
     platform = detect_platform(url) if url else "unsupported"
     if platform != "instagram" or not is_supported_instagram_url(url):
-        await update.message.reply_text("❌ Sirf supported Instagram Reel, Post, Story ya Live link bhejein.")
+        await message.reply_text("❌ Sirf supported Instagram Reel, Post, Story ya Live link bhejein.")
+        return
+    if not context.user_data.pop("choice_confirmed", False):
+        context.user_data["pending_url"] = url
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("360p", callback_data="media:360"), InlineKeyboardButton("480p", callback_data="media:480")],
+            [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p", callback_data="media:1080")],
+            [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio")],
+        ])
+        await message.reply_text("🎬 Format choose karein:", reply_markup=keyboard)
         return
     plan = "free"
-    quality = await asyncio.to_thread(database.get_video_quality, user_id)
-    status = await update.message.reply_text(f"🔍 Platform detected: {PLATFORM_NAMES[platform]}\n\n⏳ Video process ho rahi hai...")
+    quality = context.user_data.pop("selected_quality", None) or await asyncio.to_thread(database.get_video_quality, user_id)
+    await asyncio.to_thread(database.set_video_quality, user_id, quality)
+    status = await message.reply_text(f"🔍 Instagram detected · {quality}p tak\n\n⏳ Video process ho rahi hai...")
     request_dir = None
     try:
         async with download_semaphore:
@@ -163,7 +175,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             raise ReelDownloadError("Telegram file size limit exceeded")
         await status.edit_text("📤 Telegram par upload ho raha hai...")
         with result.path.open("rb") as video_file:
-            await update.message.reply_video(video=video_file, caption=f"✅ Download Complete\n\n🎬 Platform: {PLATFORM_NAMES[platform]}\n⚡ ReelDrop", supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+            await message.reply_video(video=video_file, caption=f"✅ Download Complete\n\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop", supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
         await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
         try: await status.delete()
         except BadRequest: pass
@@ -187,6 +199,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await asyncio.to_thread(delete_request_files, request_dir)
 
 
+async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query or not update.effective_user:
+        return
+    await query.answer()
+    url = context.user_data.pop("pending_url", None)
+    if not url:
+        await query.edit_message_text("⌛ Ye selection expire ho gayi. Instagram link dobara bhejein.")
+        return
+    choice = (query.data or "").removeprefix("media:")
+    await query.edit_message_text(f"✅ {'MP3 Audio' if choice == 'audio' else choice + 'p'} selected")
+    context.user_data["selected_url"] = url
+    if choice == "audio":
+        await audio_command(update, context)
+        return
+    try:
+        quality = int(choice)
+        if quality not in {360, 480, 720, 1080}:
+            raise ValueError
+    except ValueError:
+        await update.effective_message.reply_text("❌ Invalid format selection.")
+        return
+    context.user_data["selected_quality"] = quality
+    context.user_data["choice_confirmed"] = True
+    await handle_message(update, context)
+
+
 async def error_handler(update, context): logger.error("Unhandled Telegram update error", exc_info=context.error)
 
 
@@ -198,6 +237,7 @@ def main() -> None:
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("quality", quality_command), ("audio", audio_command), ("admin", admin)):
         app.add_handler(CommandHandler(command, callback))
+    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     if config.WEBHOOK_BASE_URL:

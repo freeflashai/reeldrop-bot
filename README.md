@@ -17,6 +17,7 @@ All supported Instagram content is free, downloads are unlimited, and every user
 
 ## Audio Extraction and Quality Selection
 
+- Pasting a supported Instagram link displays buttons for `360p`, `480p`, `720p`, `1080p`, and `MP3 Audio`; processing begins after a selection.
 - `/audio <Instagram link>` extracts 192 kbps MP3 audio using FFmpeg and sends it directly in Telegram.
 - `/quality 360`, `/quality 480`, `/quality 720`, or `/quality 1080` saves the user's preferred maximum video resolution.
 - `/quality` without a value shows the current setting.
