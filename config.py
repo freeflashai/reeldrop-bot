@@ -21,6 +21,12 @@ DATABASE_PATH = BASE_DIR / "reeldrop.db"
 
 MAX_DOWNLOADS_PER_HOUR = int(os.getenv("MAX_DOWNLOADS_PER_HOUR", "10"))
 MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "3"))
+# Kept as deprecated compatibility settings. Download-count limits are disabled.
+FREE_DAILY_LIMIT = int(os.getenv("FREE_DAILY_LIMIT", "0"))
+PRO_DAILY_SOFT_LIMIT = int(os.getenv("PRO_DAILY_SOFT_LIMIT", "0"))
+PRO_PRICE_STARS = int(os.getenv("PRO_PRICE_STARS", "25"))
+PRO_DURATION_DAYS = int(os.getenv("PRO_DURATION_DAYS", "30"))
+ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "0") or 0)
 MAX_TELEGRAM_FILE_SIZE_MB = int(os.getenv("MAX_TELEGRAM_FILE_SIZE_MB", "49"))
 MAX_TELEGRAM_FILE_SIZE_BYTES = MAX_TELEGRAM_FILE_SIZE_MB * 1024 * 1024
 TEMP_FILE_MAX_AGE_HOURS = int(os.getenv("TEMP_FILE_MAX_AGE_HOURS", "24"))

@@ -1,141 +1,78 @@
 # ReelDrop Bot
 
-ReelDrop is a beginner-friendly Telegram bot that accepts a public Instagram Reel or public video-post URL, downloads the best available quality up to 720p, sends the MP4 back, and removes the temporary file.
+ReelDrop is a Telegram bot that auto-detects a supported video platform, applies Free/Pro access and quality rules, sends the video in Telegram, records the outcome in SQLite, and removes request files.
 
-It does not bypass Instagram login, private accounts, DRM, or access controls. A video must be publicly accessible to `yt-dlp`.
+## Supported Platforms
 
-## What you need
+- Instagram: public Reels and public video posts (`/reel/`, `/reels/`, `/p/`)
+- Facebook: publicly accessible videos and Reels, including `fb.watch`
+- Snapchat (Pro): publicly accessible/authorized links where yt-dlp supports them
+- YouTube (Pro): only content the user owns, is licensed to download, or is explicitly downloadable/permitted
 
-- Windows 10/11
-- Python 3.11 or newer
-- A Telegram bot token
-- FFmpeg
+Hostname detection uses parsed HTTP/HTTPS URLs. It rejects malformed URLs, local hosts, other schemes, and lookalike domains.
 
-## STEP 1: Install Python
+## Free vs Pro
 
-Download Python from [python.org](https://www.python.org/downloads/). During installation, select **Add Python to PATH**. Open PowerShell and check:
+| Plan | Platforms | Daily use | Quality |
+|---|---|---:|---:|
+| Free | Instagram, Facebook | Unlimited | up to 720p |
+| Pro | All supported platforms | Unlimited | up to 1080p |
 
-```powershell
-python --version
-```
+ReelDrop Pro costs 25 Telegram Stars for 30 days. `/upgrade` opens the Stars invoice. The bot never upscales video.
 
-## STEP 2: Create a Telegram bot
+## Public/Authorized Content and YouTube Limitations
 
-1. Open Telegram and chat with `@BotFather`.
-2. Send `/newbot`.
-3. Choose a display name and a username ending in `bot`.
+ReelDrop does not bypass DRM, logins, private content, age restrictions, geo-blocks, restricted groups, disappearing-content controls, or other access controls. YouTube use is limited to content the user is authorized to download. No cookies or credentials are accepted or harvested.
 
-## STEP 3: Get the bot token
+## Setup and Environment Variables
 
-BotFather will send a token that looks like `123456789:ABC...`. Treat it like a password and never commit or share it.
+Install Python 3.11+, copy `.env.example` to `.env`, set `TELEGRAM_BOT_TOKEN`, install dependencies with `pip install -r requirements.txt`, then run `python bot.py`.
 
-## STEP 4: Create `.env`
+Required/important variables:
 
-In PowerShell, enter the project folder and copy the example:
+- `TELEGRAM_BOT_TOKEN`
+- `ADMIN_TELEGRAM_ID` for `/admin`, `/makepro USER_ID`, `/removepro USER_ID`
+- `PRO_PRICE_STARS=25`, `PRO_DURATION_DAYS=30`
+- `FREE_DAILY_LIMIT=0`, `PRO_DAILY_SOFT_LIMIT=0` are legacy compatibility settings; download-count limits are disabled
+- `MAX_CONCURRENT_DOWNLOADS=3`
+- `MAX_TELEGRAM_FILE_SIZE_MB=49`, `TEMP_FILE_MAX_AGE_HOURS=24`
+- `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET_TOKEN`, and `PORT` for webhook deployments
 
-```powershell
-cd "C:\Users\LENOVO\Desktop\instagram reel downloader bot\reeldrop-bot"
-Copy-Item .env.example .env
-notepad .env
-```
+Never commit `.env`.
 
-Replace `your_token_here` with the token from BotFather:
+## FFmpeg
 
-```dotenv
-TELEGRAM_BOT_TOKEN=123456789:paste_your_real_token_here
-```
+FFmpeg is required when yt-dlp merges video and audio. On Windows run `winget install Gyan.FFmpeg`; on Debian/Ubuntu run `sudo apt-get update && sudo apt-get install -y ffmpeg`. Verify with `ffmpeg -version`. An executable available on `PATH` works on Windows, Render, Oracle Cloud, and Linux VPS hosts.
 
-Save and close Notepad. `.env` is ignored by Git.
+## Admin Analytics
 
-## STEP 5: Install FFmpeg on Windows
+`/admin` shows successful totals, today's successes, Active Pro/Free users, and per-platform successful downloads. Failed attempts are stored but excluded. `/mystats` shows plan, platform breakdown, and expiry or remaining Free allowance.
 
-The simplest option is Windows Package Manager:
+## Render Deployment
 
-```powershell
-winget install Gyan.FFmpeg
-```
+The included Dockerfile installs FFmpeg. Create a private repository, deploy it as a Docker web service, set `TELEGRAM_BOT_TOKEN` and `ADMIN_TELEGRAM_ID`, and use a persistent disk for `reeldrop.db` if analytics must survive restarts. `RENDER_EXTERNAL_URL` automatically enables webhook mode.
 
-Close and reopen PowerShell, then verify:
+## Oracle Cloud / Linux VPS Deployment
 
-```powershell
-ffmpeg -version
-```
+Install Python, FFmpeg, and the requirements; copy the project and `.env`; then run `python bot.py` under systemd or another supervisor. Without `WEBHOOK_BASE_URL`, polling is used. Give the service account write access to the project database and `temp/`.
 
-If `winget` is unavailable, download a Windows build from [ffmpeg.org](https://ffmpeg.org/download.html), extract it, and add its `bin` folder to your Windows `PATH`.
+## Database and Temporary Files
 
-## STEP 6: Create and activate a virtual environment
+Startup safely adds missing `platform`, `requested_quality`, `plan`, and `pro_until` fields without deleting records. Each job uses `temp/<user_id>/<request_uuid>/`. Its files are removed after success or any failure, and stale files are cleaned at startup.
 
-```powershell
-python -m venv venv
-venv\Scripts\activate
-```
+## Testing
 
-If PowerShell blocks activation, run this once in the current window and try again:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-venv\Scripts\activate
-```
-
-## STEP 7: Install packages
-
-```powershell
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-## STEP 8: Run the bot
-
-```powershell
-python bot.py
-```
-
-Keep that PowerShell window open. Stop the bot with `Ctrl+C`.
-
-## Test it
-
-1. Open your bot in Telegram.
-2. Send `/start`.
-3. Paste a public Instagram Reel URL.
-4. Wait for the MP4 reply.
-
-Commands:
-
-- `/start` — welcome and quick instructions
-- `/help` — supported links and limitations
-- `/stats` — total successes, your successes, and failures
-
-## Configuration
-
-Optional `.env` values:
-
-- `MAX_DOWNLOADS_PER_HOUR=10` — successful downloads allowed per user in the previous hour
-- `MAX_CONCURRENT_DOWNLOADS=3` — concurrent yt-dlp jobs
-- `MAX_TELEGRAM_FILE_SIZE_MB=49` — conservative upload-size ceiling
-- `TEMP_FILE_MAX_AGE_HOURS=24` — startup cleanup age
-
-The SQLite database (`reeldrop.db`) is created automatically. Downloads go into unique folders under `temp/` and are deleted after success or failure.
-
-## Deploy on Render Free
-
-The included `Dockerfile` installs FFmpeg and runs the bot. On a local laptop the bot uses polling. On Render it automatically uses a Telegram webhook through Render's `RENDER_EXTERNAL_URL`.
-
-1. Push this folder to a private GitHub repository. Never upload `.env`.
-2. In Render, choose **New Web Service** and connect the repository.
-3. Choose the **Free** instance type. Render detects the Dockerfile.
-4. Add the secret environment variable `TELEGRAM_BOT_TOKEN` with the BotFather token.
-5. Deploy and wait for `Starting in webhook mode` in the logs.
-
-Render Free sleeps after inactivity and its filesystem is temporary. The first message after sleep can be delayed, and `/stats` data can reset after a restart. Downloaded videos are temporary by design.
+Run `python -m unittest discover -s tests -v`. Network downloads are intentionally not part of unit tests; validate representative public/authorized links manually because extractor and source availability change.
 
 ## Troubleshooting
 
-- **Token missing:** confirm the file is named exactly `.env`, not `.env.txt`.
-- **FFmpeg error:** reopen PowerShell and run `ffmpeg -version`.
-- **Instagram download fails:** update the extractor with `pip install -U yt-dlp`. Instagram changes frequently, and private/login-required content is intentionally unsupported.
-- **File too large:** Telegram bot uploads have size limits. This bot reports the issue and deletes the temporary file.
+- Update extractors: `python -m pip install -U yt-dlp`.
+- Confirm FFmpeg is on `PATH` if merging fails.
+- Private/login-required/restricted links are intentionally rejected.
+- Telegram file-size limits are configurable, but the Bot API ultimately controls upload acceptance.
+- On ephemeral hosts, attach persistent storage for SQLite analytics.
 
-## Project files
+## Project Tree
 
 ```text
 reeldrop-bot/
@@ -143,10 +80,17 @@ reeldrop-bot/
 ├── config.py
 ├── database.py
 ├── downloader.py
+├── platforms/
+│   ├── __init__.py
+│   ├── base.py
+│   ├── facebook.py
+│   ├── instagram.py
+│   ├── snapchat.py
+│   └── youtube.py
+├── tests/test_core.py
 ├── requirements.txt
+├── Dockerfile
+├── render.yaml
 ├── .env.example
-├── .gitignore
-├── README.md
-└── temp/
-    └── .gitkeep
+└── temp/.gitkeep
 ```
