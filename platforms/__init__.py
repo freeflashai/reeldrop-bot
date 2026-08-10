@@ -16,9 +16,6 @@ logger = logging.getLogger(__name__)
 
 PLATFORM_HOSTS = {
     "instagram": {"instagram.com", "www.instagram.com"},
-    "facebook": {"facebook.com", "www.facebook.com", "m.facebook.com", "fb.watch", "www.fb.watch"},
-    "snapchat": {"snapchat.com", "www.snapchat.com"},
-    "youtube": {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"},
 }
 
 
@@ -35,14 +32,6 @@ class PrivateOrInaccessibleError(ReelDownloadError):
 
 
 class VideoUnavailableError(ReelDownloadError):
-    pass
-
-
-class YouTubeNotPermittedError(ReelDownloadError):
-    pass
-
-
-class SnapchatUnsupportedError(ReelDownloadError):
     pass
 
 
@@ -87,10 +76,6 @@ def extract_url(text: str) -> str | None:
 
 def _classify_error(error: DownloadError, platform: str):
     message = str(error).lower()
-    if platform == "youtube" and any(x in message for x in ("sign in", "age-restricted", "copyright", "drm", "members-only")):
-        return YouTubeNotPermittedError(str(error))
-    if platform == "snapchat" and any(x in message for x in ("unsupported url", "no video formats")):
-        return SnapchatUnsupportedError(str(error))
     if "requested format is not available" in message:
         return ReelDownloadError(str(error))
     if any(x in message for x in ("private", "login required", "not authorized", "restricted", "sign in")):
@@ -106,8 +91,8 @@ def download_video(url: str, platform: str, quality_limit: int, temp_root: Path,
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
     options = {
-        # Some direct-video extractors (notably Snapchat) omit height metadata.
-        # Prefer the capped formats, then fall back to their original MP4/source.
+        # Some direct Instagram formats omit height metadata. Prefer capped
+        # formats, then fall back to the original MP4/source without upscaling.
         "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
         "outtmpl": str(request_dir / "video.%(ext)s"),
         "merge_output_format": "mp4",

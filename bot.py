@@ -9,9 +9,10 @@ from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandl
 
 import config
 from database import Database, PLATFORMS
-from downloader import (PrivateOrInaccessibleError, ReelDownloadError, SnapchatUnsupportedError,
-                        UnsupportedUrlError, VideoUnavailableError, YouTubeNotPermittedError,
+from downloader import (PrivateOrInaccessibleError, ReelDownloadError,
+                        UnsupportedUrlError, VideoUnavailableError,
                         cleanup_old_temp_files, delete_request_files, detect_platform, download_video, extract_url)
+from platforms.instagram import is_supported_instagram_url
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -22,12 +23,11 @@ download_semaphore = asyncio.Semaphore(config.MAX_CONCURRENT_DOWNLOADS)
 
 WELCOME_TEXT = """👋 Welcome to ReelDrop
 
-One bot. Multiple platforms. ⚡
-
 📸 Instagram
-🔵 Facebook
-👻 Snapchat
-▶️ YouTube*
+
+🎬 Reels & video posts
+📖 Public Stories
+🔴 Public Live videos
 
 🔗 Bas supported video link bhejo.
 🎬 Best available quality me video directly Telegram par pao.
@@ -37,7 +37,7 @@ One bot. Multiple platforms. ⚡
 ⚡ Fast processing
 📱 Directly on Telegram
 
-*YouTube support is limited to content you own, are licensed to download, or that is explicitly downloadable/permitted.
+Private, login-required ya restricted content process nahi hota.
 
 Just paste the link 👇"""
 PLATFORM_NAMES = {name: name.title() for name in PLATFORMS}
@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
-        await update.message.reply_text("Instagram, Facebook, Snapchat aur permitted YouTube links sabke liye free aur unlimited hain. Private, DRM, login-required, restricted, ya unauthorized content process nahi hota. Bas HTTP/HTTPS video link paste karein.")
+        await update.message.reply_text("Public Instagram Reel, video post, Story ya Live link bhejein. Bot free aur unlimited hai. Private, login-required, expired Story, ended/unavailable Live ya restricted content process nahi hota.")
 
 
 async def upgrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -70,24 +70,8 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     total, today, pro, free, breakdown = await asyncio.to_thread(database.admin_stats)
     lines = ["📊 ReelDrop Admin", "", f"Total Successful Downloads: {total}", f"Downloads Today: {today}", f"Registered Users: {pro + free}", "Plan: Free (Unlimited)", "", "Platform Breakdown:"]
-    lines += [f"{PLATFORM_NAMES[p]}: {breakdown.get(p, 0)}" for p in PLATFORMS]
+    lines += [f"Instagram: {breakdown.get('instagram', 0)}"]
     await update.message.reply_text("\n".join(lines))
-
-
-async def _admin_plan(update: Update, context: ContextTypes.DEFAULT_TYPE, remove=False) -> None:
-    if not update.message or not _is_admin(update):
-        return
-    try:
-        target = int(context.args[0])
-    except (IndexError, ValueError):
-        await update.message.reply_text(f"Usage: /{'removepro' if remove else 'makepro'} TELEGRAM_USER_ID")
-        return
-    await asyncio.to_thread(database.remove_pro if remove else database.set_pro, target, *(() if remove else (config.PRO_DURATION_DAYS,)))
-    await update.message.reply_text(f"✅ User {target} {'is now Free' if remove else 'is now Pro'}.")
-
-
-async def makepro(update, context): await _admin_plan(update, context)
-async def removepro(update, context): await _admin_plan(update, context, True)
 
 
 async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -96,7 +80,7 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
     total, breakdown = await asyncio.to_thread(database.user_stats, user_id)
     lines = ["📊 Your ReelDrop Stats", "", "Plan: Free (Unlimited)", f"Total Downloads: {total}", ""]
-    lines += [f"{PLATFORM_NAMES[p]}: {breakdown.get(p, 0)}" for p in PLATFORMS]
+    lines += [f"Instagram: {breakdown.get('instagram', 0)}"]
     lines += ["", "Download limit: Unlimited", "Quality: Up to 1080p"]
     await update.message.reply_text("\n".join(lines))
 
@@ -107,8 +91,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     url = extract_url(update.message.text or "")
     platform = detect_platform(url) if url else "unsupported"
-    if platform == "unsupported":
-        await update.message.reply_text("❌ Ye platform abhi supported nahi hai.")
+    if platform != "instagram" or not is_supported_instagram_url(url):
+        await update.message.reply_text("❌ Sirf supported Instagram Reel, Post, Story ya Live link bhejein.")
         return
     plan, quality = "free", 1080
     status = await update.message.reply_text(f"🔍 Platform detected: {PLATFORM_NAMES[platform]}\n\n⏳ Video process ho rahi hai...")
@@ -131,12 +115,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except VideoUnavailableError:
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
         await status.edit_text("❌ Video available nahi hai ya remove ho chuki hai.")
-    except YouTubeNotPermittedError:
-        await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
-        await status.edit_text("⚠️ Is YouTube video ko ReelDrop process nahi kar sakta.")
-    except SnapchatUnsupportedError:
-        await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
-        await status.edit_text("⚠️ Ye Snapchat link abhi process nahi ho pa raha.")
     except (NetworkError, TelegramError, ReelDownloadError, UnsupportedUrlError):
         logger.exception("Processing failed for user %s on %s", user_id, platform)
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)

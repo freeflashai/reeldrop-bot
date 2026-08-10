@@ -1,23 +1,23 @@
 # ReelDrop Bot
 
-ReelDrop is a completely free Telegram bot that auto-detects a supported video platform, sends the video in Telegram, records the outcome in SQLite, and removes request files.
+ReelDrop is a completely free, unlimited Instagram downloader Telegram bot. It accepts supported public Instagram links, sends the video in Telegram, records the outcome in SQLite, and removes request files.
 
-## Supported Platforms
+## Supported Instagram Content
 
-- Instagram: public Reels and public video posts (`/reel/`, `/reels/`, `/p/`)
-- Facebook: publicly accessible videos and Reels, including `fb.watch`
-- Snapchat: publicly accessible/authorized links where yt-dlp supports them
-- YouTube: only content the user owns, is licensed to download, or is explicitly downloadable/permitted
+- Public Reels (`/reel/`, `/reels/`)
+- Public video posts (`/p/`, `/tv/`)
+- Public, unexpired Stories (`/stories/<username>/<id>`)
+- Public, currently accessible Live URLs (`/<username>/live`)
 
-Hostname detection uses parsed HTTP/HTTPS URLs. It rejects malformed URLs, local hosts, other schemes, and lookalike domains.
+Only parsed HTTP/HTTPS URLs on `instagram.com` are accepted. The bot rejects other platforms, malformed URLs, local hosts, unsafe schemes, unsupported Instagram paths, and lookalike domains.
 
 ## Free Access
 
-All supported platforms are free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` only confirms that the bot is free; it never opens a payment invoice. The bot never upscales video.
+All supported Instagram content is free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` only confirms that the bot is free; it never opens a payment invoice. The bot never upscales video.
 
-## Public/Authorized Content and YouTube Limitations
+## Public Content Limitations
 
-ReelDrop does not bypass DRM, logins, private content, age restrictions, geo-blocks, restricted groups, disappearing-content controls, or other access controls. YouTube use is limited to content the user is authorized to download. No cookies or credentials are accepted or harvested.
+ReelDrop does not bypass Instagram login, private accounts, expired Stories, inaccessible Live sessions, DRM, or other access controls. No cookies or credentials are accepted or harvested. Story and Live support depends on public accessibility and yt-dlp extractor support at request time.
 
 ## Setup and Environment Variables
 
@@ -40,7 +40,7 @@ FFmpeg is required when yt-dlp merges video and audio. On Windows run `winget in
 
 ## Admin Analytics
 
-`/admin` shows successful totals, today's successes, user counts, and per-platform successful downloads. Failed attempts are stored but excluded. `/mystats` shows the free unlimited plan and platform breakdown.
+`/admin` shows successful totals, today's successes, registered users, and Instagram successful downloads. Failed attempts are stored but excluded. `/mystats` shows the free unlimited plan and Instagram download count.
 
 ## Render Deployment
 
@@ -77,10 +77,7 @@ reeldrop-bot/
 ├── platforms/
 │   ├── __init__.py
 │   ├── base.py
-│   ├── facebook.py
-│   ├── instagram.py
-│   ├── snapchat.py
-│   └── youtube.py
+│   └── instagram.py
 ├── tests/test_core.py
 ├── requirements.txt
 ├── Dockerfile

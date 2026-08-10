@@ -5,13 +5,32 @@ from pathlib import Path
 from database import Database
 from downloader import cleanup_old_temp_files, delete_request_files, detect_platform, extract_url
 from platforms import ReelDownloadError, VideoUnavailableError, _classify_error
+from platforms.instagram import is_supported_instagram_url
 from yt_dlp.utils import DownloadError
 
 
 class PlatformTests(unittest.TestCase):
     def test_detection(self):
-        cases = {"https://instagram.com/reel/x": "instagram", "https://fb.watch/x": "facebook", "https://www.snapchat.com/spotlight/x": "snapchat", "https://youtu.be/x": "youtube"}
+        cases = {"https://instagram.com/reel/x": "instagram", "https://instagram.com/stories/user.name/123456": "instagram", "https://instagram.com/user.name/live/": "instagram"}
         for url, expected in cases.items(): self.assertEqual(detect_platform(url), expected)
+
+    def test_other_platforms_are_unsupported(self):
+        for url in ("https://fb.watch/x", "https://snapchat.com/spotlight/x", "https://youtu.be/x"):
+            self.assertEqual(detect_platform(url), "unsupported")
+
+    def test_supported_instagram_content_paths(self):
+        urls = (
+            "https://instagram.com/reel/ABC_123/",
+            "https://instagram.com/p/ABC_123/",
+            "https://instagram.com/stories/user.name/123456/",
+            "https://instagram.com/user.name/live/",
+        )
+        for url in urls:
+            self.assertTrue(is_supported_instagram_url(url), url)
+
+    def test_rejects_profile_and_image_paths(self):
+        for url in ("https://instagram.com/user.name/", "https://instagram.com/explore/"):
+            self.assertFalse(is_supported_instagram_url(url), url)
 
     def test_rejects_unsafe_and_lookalike_hosts(self):
         for url in ("file:///tmp/x", "http://localhost/x", "https://instagram.com.evil.test/reel/x", "not-a-url"):
