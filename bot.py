@@ -1,7 +1,9 @@
 """Telegram handlers and application entry point for ReelDrop Bot."""
 
 import asyncio
+import hashlib
 import logging
+from urllib.parse import urlsplit, urlunsplit
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, NetworkError, TelegramError
@@ -11,7 +13,8 @@ import config
 from database import Database, PLATFORMS
 from downloader import (PrivateOrInaccessibleError, ReelDownloadError,
                         UnsupportedUrlError, VideoUnavailableError,
-                        cleanup_old_temp_files, delete_request_files, detect_platform, download_audio, download_video, extract_url)
+                        cleanup_old_temp_files, delete_request_files, detect_platform, download_audio,
+                        download_media_collection, extract_url, get_metadata)
 from platforms.instagram import is_supported_instagram_url
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -44,6 +47,37 @@ Private, login-required ya restricted content process nahi hota.
 
 Just paste the link 👇"""
 PLATFORM_NAMES = {name: name.title() for name in PLATFORMS}
+
+
+def _cache_key(url: str, media_kind: str) -> str:
+    parsed = urlsplit(url)
+    normalized = urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path.rstrip("/"), "", ""))
+    return hashlib.sha256(f"{normalized}|{media_kind}".encode()).hexdigest()
+
+
+async def _send_cached(message, cached: list[dict], caption: str) -> bool:
+    try:
+        for index, item in enumerate(cached):
+            item_caption = caption if index == 0 else None
+            if item["file_type"] == "video":
+                await message.reply_video(video=item["telegram_file_id"], caption=item_caption, supports_streaming=True)
+            elif item["file_type"] == "photo":
+                await message.reply_photo(photo=item["telegram_file_id"], caption=item_caption)
+            elif item["file_type"] == "audio":
+                await message.reply_audio(audio=item["telegram_file_id"], caption=item_caption, title=item.get("title") or "Instagram Audio")
+            else:
+                await message.reply_document(document=item["telegram_file_id"], caption=item_caption)
+        return bool(cached)
+    except TelegramError:
+        logger.warning("Cached Telegram file_id was rejected; refreshing media")
+        return False
+
+
+def _telegram_file_id(sent, file_type: str) -> str:
+    if file_type == "video": return sent.video.file_id
+    if file_type == "photo": return sent.photo[-1].file_id
+    if file_type == "audio": return sent.audio.file_id
+    return sent.document.file_id
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -89,6 +123,11 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if not url or detect_platform(url) != "instagram" or not is_supported_instagram_url(url):
         await message.reply_text("❌ Use: /audio <supported Instagram link>")
         return
+    cache_key = _cache_key(url, "audio:mp3:192")
+    cached = await asyncio.to_thread(database.get_cached_media, cache_key)
+    if cached and await _send_cached(message, cached, "✅ Audio Download Complete\n\n🎵 ReelDrop · instant cache"):
+        await asyncio.to_thread(database.record_download, user_id, "success", "instagram", None, "free")
+        return
     status = await message.reply_text("🎵 Audio extract ho rahi hai...")
     request_dir = None
     try:
@@ -99,7 +138,8 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             raise ReelDownloadError("Telegram file size limit exceeded")
         await status.edit_text("📤 Telegram par upload ho rahi hai...")
         with result.path.open("rb") as audio_file:
-            await message.reply_audio(audio=audio_file, title=result.title or "Instagram Audio", caption="✅ Audio Download Complete\n\n🎵 ReelDrop", read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+            sent = await message.reply_audio(audio=audio_file, title=result.title or "Instagram Audio", caption="✅ Audio Download Complete\n\n🎵 ReelDrop", read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+        await asyncio.to_thread(database.replace_cached_media, cache_key, [(_telegram_file_id(sent, "audio"), "audio", result.title)])
         await asyncio.to_thread(database.record_download, user_id, "success", "instagram", None, "free")
         try: await status.delete()
         except BadRequest: pass
@@ -158,24 +198,46 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("360p", callback_data="media:360"), InlineKeyboardButton("480p", callback_data="media:480")],
             [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p", callback_data="media:1080")],
-            [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio")],
+            [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio"), InlineKeyboardButton("📄 Original File", callback_data="media:file")],
+            [InlineKeyboardButton("📝 Copy Caption", callback_data="media:caption")],
         ])
         await message.reply_text("🎬 Format choose karein:", reply_markup=keyboard)
         return
     plan = "free"
     quality = context.user_data.pop("selected_quality", None) or await asyncio.to_thread(database.get_video_quality, user_id)
+    send_mode = context.user_data.pop("send_mode", "video")
     await asyncio.to_thread(database.set_video_quality, user_id, quality)
+    cache_key = _cache_key(url, f"{send_mode}:{quality}")
+    cached = await asyncio.to_thread(database.get_cached_media, cache_key)
+    cached_caption = f"✅ Download Complete\n\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop · instant cache"
+    if cached and await _send_cached(message, cached, cached_caption):
+        await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
+        return
     status = await message.reply_text(f"🔍 Instagram detected · {quality}p tak\n\n⏳ Video process ho rahi hai...")
     request_dir = None
     try:
         async with download_semaphore:
-            result = await asyncio.to_thread(download_video, url, platform, quality, config.TEMP_DIR, user_id)
+            result = await asyncio.to_thread(download_media_collection, url, platform, quality, config.TEMP_DIR, user_id)
             request_dir = result.request_dir
-        if result.path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
-            raise ReelDownloadError("Telegram file size limit exceeded")
         await status.edit_text("📤 Telegram par upload ho raha hai...")
-        with result.path.open("rb") as video_file:
-            await message.reply_video(video=video_file, caption=f"✅ Download Complete\n\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop", supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+        uploaded = []
+        total_items = len(result.paths)
+        for index, path in enumerate(result.paths):
+            if path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
+                raise ReelDownloadError("Telegram file size limit exceeded")
+            suffix = path.suffix.lower()
+            is_photo = suffix in {".jpg", ".jpeg", ".png", ".webp"}
+            file_type = "document" if send_mode == "file" else ("photo" if is_photo else "video")
+            item_caption = f"✅ Download Complete\n\n🎠 Item {index + 1}/{total_items}\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop" if index == 0 else f"🎠 Item {index + 1}/{total_items}"
+            with path.open("rb") as media_file:
+                if file_type == "document":
+                    sent = await message.reply_document(document=media_file, caption=item_caption, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+                elif file_type == "photo":
+                    sent = await message.reply_photo(photo=media_file, caption=item_caption, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+                else:
+                    sent = await message.reply_video(video=media_file, caption=item_caption, supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+            uploaded.append((_telegram_file_id(sent, file_type), file_type, result.title))
+        await asyncio.to_thread(database.replace_cached_media, cache_key, uploaded)
         await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
         try: await status.delete()
         except BadRequest: pass
@@ -209,10 +271,31 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await query.edit_message_text("⌛ Ye selection expire ho gayi. Instagram link dobara bhejein.")
         return
     choice = (query.data or "").removeprefix("media:")
-    await query.edit_message_text(f"✅ {'MP3 Audio' if choice == 'audio' else choice + 'p'} selected")
+    labels = {"audio": "MP3 Audio", "file": "Original File", "caption": "Caption"}
+    await query.edit_message_text(f"✅ {labels.get(choice, choice + 'p')} selected")
     context.user_data["selected_url"] = url
     if choice == "audio":
         await audio_command(update, context)
+        return
+    if choice == "caption":
+        context.user_data.pop("selected_url", None)
+        try:
+            metadata = await asyncio.to_thread(get_metadata, url, "instagram")
+            caption = (metadata.get("caption") or "").strip()
+            if not caption:
+                await update.effective_message.reply_text("ℹ️ Is post mein caption available nahi hai.")
+                return
+            for start in range(0, len(caption), 4000):
+                await update.effective_message.reply_text(caption[start:start + 4000])
+        except ReelDownloadError:
+            logger.exception("Caption extraction failed for user %s", update.effective_user.id)
+            await update.effective_message.reply_text("⚠️ Caption fetch nahi ho paya.")
+        return
+    if choice == "file":
+        context.user_data["selected_quality"] = await asyncio.to_thread(database.get_video_quality, update.effective_user.id)
+        context.user_data["send_mode"] = "file"
+        context.user_data["choice_confirmed"] = True
+        await handle_message(update, context)
         return
     try:
         quality = int(choice)
@@ -237,7 +320,7 @@ def main() -> None:
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("quality", quality_command), ("audio", audio_command), ("admin", admin)):
         app.add_handler(CommandHandler(command, callback))
-    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio)$"))
+    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio|file|caption)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     if config.WEBHOOK_BASE_URL:

@@ -23,6 +23,14 @@ All supported Instagram content is free, downloads are unlimited, and every user
 - `/quality` without a value shows the current setting.
 - If the selected resolution is unavailable, ReelDrop sends the best available lower/source quality and never upscales.
 
+## Carousel, Original File, Caption, and Cache
+
+- Carousel posts automatically download every media item exposed by Instagram and send them in order.
+- `📄 Original File` sends each item as a Telegram document to avoid Telegram's normal video/photo presentation and additional client-side compression.
+- `📝 Copy Caption` fetches the public post caption and sends it as copyable text, split safely when it exceeds Telegram's message limit.
+- Successful uploads store Telegram `file_id` values in SQLite by normalized URL, quality, and delivery mode. Repeated requests are served instantly without downloading the source again.
+- If Telegram rejects a stale cached `file_id`, ReelDrop automatically downloads and refreshes it.
+
 ## Public Content Limitations
 
 ReelDrop does not bypass Instagram login, private accounts, expired Stories, inaccessible Live sessions, DRM, or other access controls. No cookies or credentials are accepted or harvested. Story and Live support depends on public accessibility and yt-dlp extractor support at request time.

@@ -42,6 +42,14 @@ class DownloadResult:
     title: str | None = None
 
 
+@dataclass(frozen=True)
+class MediaCollectionResult:
+    paths: tuple[Path, ...]
+    request_dir: Path
+    title: str | None = None
+    caption: str | None = None
+
+
 def _safe_parsed_url(url: str):
     try:
         parsed = urlparse(url)
@@ -122,6 +130,58 @@ def download_video(url: str, platform: str, quality_limit: int, temp_root: Path,
     except Exception as error:
         delete_request_files(request_dir)
         raise ReelDownloadError(str(error)) from error
+
+
+def download_media_collection(url: str, platform: str, quality_limit: int, temp_root: Path, user_id: int) -> MediaCollectionResult:
+    """Download every media item exposed by a post/carousel in stable order."""
+    if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
+        raise UnsupportedUrlError("Unsupported URL")
+    request_dir = temp_root / str(user_id) / uuid4().hex
+    request_dir.mkdir(parents=True, exist_ok=False)
+    options = {
+        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
+        "outtmpl": str(request_dir / "%(playlist_index|0)03d_%(id)s.%(ext)s"),
+        "merge_output_format": "mp4",
+        "noplaylist": False,
+        "quiet": True,
+        "no_warnings": True,
+        "restrictfilenames": True,
+        "overwrites": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=True)
+        allowed = {".mp4", ".mkv", ".webm", ".mov", ".jpg", ".jpeg", ".png", ".webp"}
+        paths = tuple(sorted((p for p in request_dir.iterdir() if p.is_file() and p.suffix.lower() in allowed), key=lambda p: p.name))
+        if not paths:
+            raise ReelDownloadError("Downloader produced no carousel media")
+        entries = info.get("entries") or []
+        first = next((entry for entry in entries if entry), info)
+        caption = info.get("description") or first.get("description") or info.get("title")
+        return MediaCollectionResult(paths, request_dir, info.get("title") or first.get("title"), caption)
+    except DownloadError as error:
+        delete_request_files(request_dir)
+        raise _classify_error(error, platform) from error
+    except ReelDownloadError:
+        delete_request_files(request_dir)
+        raise
+    except Exception as error:
+        delete_request_files(request_dir)
+        raise ReelDownloadError(str(error)) from error
+
+
+def get_metadata(url: str, platform: str) -> dict:
+    """Fetch public metadata without downloading media."""
+    if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
+        raise UnsupportedUrlError("Unsupported URL")
+    try:
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": False}) as ydl:
+            info = ydl.extract_info(url, download=False)
+        entries = info.get("entries") or []
+        first = next((entry for entry in entries if entry), info)
+        return {"caption": info.get("description") or first.get("description") or info.get("title") or "", "title": info.get("title") or first.get("title") or "", "count": len(entries) or 1}
+    except DownloadError as error:
+        raise _classify_error(error, platform) from error
 
 
 def download_audio(url: str, platform: str, temp_root: Path, user_id: int) -> DownloadResult:

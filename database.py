@@ -39,6 +39,15 @@ class Database:
                     timestamp TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('success','failed'))
                 );
                 CREATE INDEX IF NOT EXISTS idx_downloads_user_time ON downloads (telegram_user_id, timestamp);
+                CREATE TABLE IF NOT EXISTS media_cache (
+                    cache_key TEXT NOT NULL,
+                    item_index INTEGER NOT NULL,
+                    telegram_file_id TEXT NOT NULL,
+                    file_type TEXT NOT NULL,
+                    title TEXT,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (cache_key, item_index)
+                );
             """)
             self._add_column(connection, "users", "pro_until", "TEXT")
             self._add_column(connection, "users", "video_quality", "INTEGER NOT NULL DEFAULT 1080")
@@ -69,6 +78,23 @@ class Database:
         self.ensure_user(user_id)
         with self._lock, self._connection() as connection:
             connection.execute("UPDATE users SET video_quality=? WHERE telegram_user_id=?", (quality, user_id))
+
+    def get_cached_media(self, cache_key: str) -> list[dict]:
+        with self._lock, self._connection() as connection:
+            rows = connection.execute(
+                "SELECT telegram_file_id,file_type,title FROM media_cache WHERE cache_key=? ORDER BY item_index",
+                (cache_key,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def replace_cached_media(self, cache_key: str, items: list[tuple[str, str, str | None]]) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connection() as connection:
+            connection.execute("DELETE FROM media_cache WHERE cache_key=?", (cache_key,))
+            connection.executemany(
+                "INSERT INTO media_cache (cache_key,item_index,telegram_file_id,file_type,title,created_at) VALUES (?,?,?,?,?,?)",
+                [(cache_key, index, file_id, file_type, title, now) for index, (file_id, file_type, title) in enumerate(items)],
+            )
 
     def is_pro(self, user_id: int) -> bool:
         with self._lock, self._connection() as connection:

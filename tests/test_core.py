@@ -58,6 +58,13 @@ class DatabaseTests(unittest.TestCase):
             db.set_video_quality(7, 480)
             self.assertEqual(db.get_video_quality(7), 480)
             with self.assertRaises(ValueError): db.set_video_quality(7, 999)
+            db.replace_cached_media("key", [("file-a", "video", "Title"), ("file-b", "photo", None)])
+            self.assertEqual(db.get_cached_media("key"), [
+                {"telegram_file_id": "file-a", "file_type": "video", "title": "Title"},
+                {"telegram_file_id": "file-b", "file_type": "photo", "title": None},
+            ])
+            db.replace_cached_media("key", [("file-c", "document", None)])
+            self.assertEqual(len(db.get_cached_media("key")), 1)
 
     def test_temp_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:

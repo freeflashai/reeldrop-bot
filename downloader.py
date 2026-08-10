@@ -2,6 +2,7 @@
 
 from platforms import (  # noqa: F401
     DownloadResult,
+    MediaCollectionResult,
     PrivateOrInaccessibleError,
     ReelDownloadError,
     UnsupportedUrlError,
@@ -10,8 +11,10 @@ from platforms import (  # noqa: F401
     delete_request_files,
     detect_platform,
     download_audio,
+    download_media_collection,
     download_video,
     extract_url,
+    get_metadata,
 )
 from platforms.instagram import extract_instagram_url, is_supported_instagram_url
 
