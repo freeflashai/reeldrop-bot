@@ -6,7 +6,7 @@ import logging
 from urllib.parse import urlsplit, urlunsplit
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.error import BadRequest, NetworkError, TelegramError
+from telegram.error import BadRequest, Forbidden, NetworkError, TelegramError
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 import config
@@ -47,6 +47,44 @@ Private, login-required ya restricted content process nahi hota.
 
 Just paste the link 👇"""
 PLATFORM_NAMES = {name: name.title() for name in PLATFORMS}
+
+
+def _has_channel_access(member) -> bool:
+    """Return whether a getChatMember result represents a current member."""
+    status = getattr(member, "status", "")
+    return status in {"creator", "administrator", "member"} or (
+        status == "restricted" and bool(getattr(member, "is_member", False))
+    )
+
+
+def _join_keyboard() -> InlineKeyboardMarkup | None:
+    if not config.REQUIRED_CHANNEL_URL:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton("📢 Join Channel", url=config.REQUIRED_CHANNEL_URL)]])
+
+
+async def _require_channel_membership(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Gate downloads behind membership of the configured Telegram channel."""
+    if not config.REQUIRED_CHANNEL_ID or not update.effective_user:
+        return True
+    try:
+        member = await context.bot.get_chat_member(config.REQUIRED_CHANNEL_ID, update.effective_user.id)
+        if _has_channel_access(member):
+            return True
+    except (BadRequest, Forbidden):
+        logger.exception(
+            "Channel membership check failed. Ensure the bot is an admin in %s",
+            config.REQUIRED_CHANNEL_ID,
+        )
+        await update.effective_message.reply_text(
+            "⚠️ Membership verify nahi ho pa rahi. Bot admin se contact karein."
+        )
+        return False
+    await update.effective_message.reply_text(
+        "🔒 Reel download karne ke liye pehle hamara channel join karein, phir link dobara bhejein.",
+        reply_markup=_join_keyboard(),
+    )
+    return False
 
 
 def _cache_key(url: str, media_kind: str) -> str:
@@ -118,6 +156,8 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     message = update.effective_message
     if not message or not update.effective_user:
         return
+    if not await _require_channel_membership(update, context):
+        return
     user_id = update.effective_user.id
     url = context.user_data.pop("selected_url", None) or extract_url(" ".join(context.args))
     if not url or detect_platform(url) != "instagram" or not is_supported_instagram_url(url):
@@ -186,6 +226,8 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not update.effective_user:
+        return
+    if not await _require_channel_membership(update, context):
         return
     user_id = update.effective_user.id
     url = context.user_data.pop("selected_url", None) or extract_url(message.text or "")
@@ -263,6 +305,8 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not query or not update.effective_user:
         return
     await query.answer()
+    if not await _require_channel_membership(update, context):
+        return
     url = context.user_data.pop("pending_url", None)
     if not url:
         await query.edit_message_text("⌛ Ye selection expire ho gayi. Instagram link dobara bhejein.")

@@ -42,12 +42,16 @@ Required/important variables:
 
 - `TELEGRAM_BOT_TOKEN`
 - `ADMIN_TELEGRAM_ID` for `/admin`
+- `REQUIRED_CHANNEL_ID=@yourchannel` (or a numeric `-100...` ID) makes channel membership mandatory before downloads
+- `REQUIRED_CHANNEL_URL=https://t.me/yourchannel` adds the Join Channel button; for a private channel, use its invite link
 - `FREE_DAILY_LIMIT=0`, `PRO_DAILY_SOFT_LIMIT=0` are legacy compatibility settings; download-count limits are disabled
 - `MAX_CONCURRENT_DOWNLOADS=3`
 - `MAX_TELEGRAM_FILE_SIZE_MB=49`, `TEMP_FILE_MAX_AGE_HOURS=24`
 - `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET_TOKEN`, and `PORT` for webhook deployments
 
 Never commit `.env`.
+
+For mandatory membership checks, add the bot as an administrator in the required channel. The bot checks membership again on every download entry point, so users who leave the channel lose access.
 
 ## FFmpeg
 

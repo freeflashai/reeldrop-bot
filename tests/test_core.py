@@ -1,15 +1,25 @@
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 
 from database import Database
 from downloader import cleanup_old_temp_files, delete_request_files, detect_platform, extract_url
 from platforms import ReelDownloadError, VideoUnavailableError, _classify_error
 from platforms.instagram import is_supported_instagram_url
+from bot import _has_channel_access
 from yt_dlp.utils import DownloadError
 
 
 class PlatformTests(unittest.TestCase):
+    def test_channel_access_statuses(self):
+        for status in ("creator", "administrator", "member"):
+            self.assertTrue(_has_channel_access(SimpleNamespace(status=status)))
+        self.assertTrue(_has_channel_access(SimpleNamespace(status="restricted", is_member=True)))
+        for status in ("left", "kicked"):
+            self.assertFalse(_has_channel_access(SimpleNamespace(status=status)))
+        self.assertFalse(_has_channel_access(SimpleNamespace(status="restricted", is_member=False)))
+
     def test_detection(self):
         cases = {"https://instagram.com/reel/x": "instagram", "https://instagram.com/stories/user.name/123456": "instagram", "https://instagram.com/user.name/live/": "instagram"}
         for url, expected in cases.items(): self.assertEqual(detect_platform(url), expected)

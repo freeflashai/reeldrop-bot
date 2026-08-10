@@ -27,6 +27,11 @@ PRO_DAILY_SOFT_LIMIT = int(os.getenv("PRO_DAILY_SOFT_LIMIT", "0"))
 PRO_PRICE_STARS = int(os.getenv("PRO_PRICE_STARS", "25"))
 PRO_DURATION_DAYS = int(os.getenv("PRO_DURATION_DAYS", "30"))
 ADMIN_TELEGRAM_ID = int(os.getenv("ADMIN_TELEGRAM_ID", "0") or 0)
+# Channel username (for example: @mychannel) or numeric chat ID (-100...).
+# Leave empty to disable the mandatory channel-membership check.
+_required_channel_id = os.getenv("REQUIRED_CHANNEL_ID", "").strip()
+REQUIRED_CHANNEL_ID = int(_required_channel_id) if _required_channel_id.lstrip("-").isdigit() else _required_channel_id
+REQUIRED_CHANNEL_URL = os.getenv("REQUIRED_CHANNEL_URL", "").strip()
 MAX_TELEGRAM_FILE_SIZE_MB = int(os.getenv("MAX_TELEGRAM_FILE_SIZE_MB", "49"))
 MAX_TELEGRAM_FILE_SIZE_BYTES = MAX_TELEGRAM_FILE_SIZE_MB * 1024 * 1024
 TEMP_FILE_MAX_AGE_HOURS = int(os.getenv("TEMP_FILE_MAX_AGE_HOURS", "24"))
