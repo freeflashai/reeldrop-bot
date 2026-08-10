@@ -1,24 +1,19 @@
 # ReelDrop Bot
 
-ReelDrop is a Telegram bot that auto-detects a supported video platform, applies Free/Pro access and quality rules, sends the video in Telegram, records the outcome in SQLite, and removes request files.
+ReelDrop is a completely free Telegram bot that auto-detects a supported video platform, sends the video in Telegram, records the outcome in SQLite, and removes request files.
 
 ## Supported Platforms
 
 - Instagram: public Reels and public video posts (`/reel/`, `/reels/`, `/p/`)
 - Facebook: publicly accessible videos and Reels, including `fb.watch`
-- Snapchat (Pro): publicly accessible/authorized links where yt-dlp supports them
-- YouTube (Pro): only content the user owns, is licensed to download, or is explicitly downloadable/permitted
+- Snapchat: publicly accessible/authorized links where yt-dlp supports them
+- YouTube: only content the user owns, is licensed to download, or is explicitly downloadable/permitted
 
 Hostname detection uses parsed HTTP/HTTPS URLs. It rejects malformed URLs, local hosts, other schemes, and lookalike domains.
 
-## Free vs Pro
+## Free Access
 
-| Plan | Platforms | Daily use | Quality |
-|---|---|---:|---:|
-| Free | Instagram, Facebook | Unlimited | up to 720p |
-| Pro | All supported platforms | Unlimited | up to 1080p |
-
-ReelDrop Pro costs 25 Telegram Stars for 30 days. `/upgrade` opens the Stars invoice. The bot never upscales video.
+All supported platforms are free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` only confirms that the bot is free; it never opens a payment invoice. The bot never upscales video.
 
 ## Public/Authorized Content and YouTube Limitations
 
@@ -31,8 +26,7 @@ Install Python 3.11+, copy `.env.example` to `.env`, set `TELEGRAM_BOT_TOKEN`, i
 Required/important variables:
 
 - `TELEGRAM_BOT_TOKEN`
-- `ADMIN_TELEGRAM_ID` for `/admin`, `/makepro USER_ID`, `/removepro USER_ID`
-- `PRO_PRICE_STARS=25`, `PRO_DURATION_DAYS=30`
+- `ADMIN_TELEGRAM_ID` for `/admin`
 - `FREE_DAILY_LIMIT=0`, `PRO_DAILY_SOFT_LIMIT=0` are legacy compatibility settings; download-count limits are disabled
 - `MAX_CONCURRENT_DOWNLOADS=3`
 - `MAX_TELEGRAM_FILE_SIZE_MB=49`, `TEMP_FILE_MAX_AGE_HOURS=24`
@@ -46,7 +40,7 @@ FFmpeg is required when yt-dlp merges video and audio. On Windows run `winget in
 
 ## Admin Analytics
 
-`/admin` shows successful totals, today's successes, Active Pro/Free users, and per-platform successful downloads. Failed attempts are stored but excluded. `/mystats` shows plan, platform breakdown, and expiry or remaining Free allowance.
+`/admin` shows successful totals, today's successes, user counts, and per-platform successful downloads. Failed attempts are stored but excluded. `/mystats` shows the free unlimited plan and platform breakdown.
 
 ## Render Deployment
 

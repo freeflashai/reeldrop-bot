@@ -2,11 +2,10 @@
 
 import asyncio
 import logging
-from datetime import datetime
 
-from telegram import LabeledPrice, Update
+from telegram import Update
 from telegram.error import BadRequest, NetworkError, TelegramError
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, PreCheckoutQueryHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 import config
 from database import Database, PLATFORMS
@@ -41,7 +40,6 @@ One bot. Multiple platforms. ⚡
 *YouTube support is limited to content you own, are licensed to download, or that is explicitly downloadable/permitted.
 
 Just paste the link 👇"""
-PRO_ONLY_TEXT = "🔒 Ye platform ReelDrop Pro me available hai.\n\n⚡ ReelDrop Pro\n⭐ 25 Stars / 30 Days\n\nUse /upgrade"
 PLATFORM_NAMES = {name: name.title() for name in PLATFORMS}
 
 
@@ -54,28 +52,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
-        await update.message.reply_text("Instagram aur Facebook public links Free hain. Snapchat aur permitted YouTube links Pro hain. Private, DRM, login-required, restricted, ya unauthorized content process nahi hota. Bas HTTP/HTTPS video link paste karein.")
+        await update.message.reply_text("Instagram, Facebook, Snapchat aur permitted YouTube links sabke liye free aur unlimited hain. Private, DRM, login-required, restricted, ya unauthorized content process nahi hota. Bas HTTP/HTTPS video link paste karein.")
 
 
 async def upgrade(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
-    await update.message.reply_invoice(title="ReelDrop Pro", description=f"Pro access for {config.PRO_DURATION_DAYS} days", payload="reeldrop-pro-30", currency="XTR", prices=[LabeledPrice("ReelDrop Pro", config.PRO_PRICE_STARS)])
-
-
-async def precheckout(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.pre_checkout_query
-    if query:
-        await query.answer(ok=query.invoice_payload == "reeldrop-pro-30", error_message="Invalid ReelDrop payment." if query.invoice_payload != "reeldrop-pro-30" else None)
-
-
-async def successful_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message or not update.effective_user or not update.message.successful_payment:
-        return
-    payment = update.message.successful_payment
-    if payment.invoice_payload == "reeldrop-pro-30" and payment.currency == "XTR" and payment.total_amount == config.PRO_PRICE_STARS:
-        await asyncio.to_thread(database.set_pro, update.effective_user.id, config.PRO_DURATION_DAYS)
-        await update.message.reply_text(f"✅ ReelDrop Pro active ho gaya — {config.PRO_DURATION_DAYS} days ke liye.")
+    await update.message.reply_text("✅ ReelDrop ab sabke liye bilkul free aur unlimited hai. Bas supported video link bhejein.")
 
 
 def _is_admin(update: Update) -> bool:
@@ -86,7 +69,7 @@ async def admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not _is_admin(update):
         return
     total, today, pro, free, breakdown = await asyncio.to_thread(database.admin_stats)
-    lines = ["📊 ReelDrop Admin", "", f"Total Successful Downloads: {total}", f"Downloads Today: {today}", f"Active Pro Users: {pro}", f"Free Users: {free}", "", "Platform Breakdown:"]
+    lines = ["📊 ReelDrop Admin", "", f"Total Successful Downloads: {total}", f"Downloads Today: {today}", f"Registered Users: {pro + free}", "Plan: Free (Unlimited)", "", "Platform Breakdown:"]
     lines += [f"{PLATFORM_NAMES[p]}: {breakdown.get(p, 0)}" for p in PLATFORMS]
     await update.message.reply_text("\n".join(lines))
 
@@ -111,15 +94,10 @@ async def mystats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.effective_user:
         return
     user_id = update.effective_user.id
-    pro = await asyncio.to_thread(database.is_pro, user_id)
     total, breakdown = await asyncio.to_thread(database.user_stats, user_id)
-    lines = ["📊 Your ReelDrop Stats", "", f"Plan: {'Pro' if pro else 'Free'}", f"Total Downloads: {total}", ""]
+    lines = ["📊 Your ReelDrop Stats", "", "Plan: Free (Unlimited)", f"Total Downloads: {total}", ""]
     lines += [f"{PLATFORM_NAMES[p]}: {breakdown.get(p, 0)}" for p in PLATFORMS]
-    if pro:
-        expiry = await asyncio.to_thread(database.pro_expiry, user_id)
-        lines += ["", f"Pro Expiry: {datetime.fromisoformat(expiry).strftime('%d %b %Y')}"]
-    else:
-        lines += ["", "Download limit: Unlimited"]
+    lines += ["", "Download limit: Unlimited", "Quality: Up to 1080p"]
     await update.message.reply_text("\n".join(lines))
 
 
@@ -132,11 +110,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if platform == "unsupported":
         await update.message.reply_text("❌ Ye platform abhi supported nahi hai.")
         return
-    pro = await asyncio.to_thread(database.is_pro, user_id)
-    plan, quality = ("pro", 1080) if pro else ("free", 720)
-    if platform in {"snapchat", "youtube"} and not pro:
-        await update.message.reply_text(PRO_ONLY_TEXT)
-        return
+    plan, quality = "free", 1080
     status = await update.message.reply_text(f"🔍 Platform detected: {PLATFORM_NAMES[platform]}\n\n⏳ Video process ho rahi hai...")
     request_dir = None
     try:
@@ -147,7 +121,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             raise ReelDownloadError("Telegram file size limit exceeded")
         await status.edit_text("📤 Telegram par upload ho raha hai...")
         with result.path.open("rb") as video_file:
-            await update.message.reply_video(video=video_file, caption=f"✅ Download Complete\n\n🎬 Platform: {PLATFORM_NAMES[platform]}\n⚡ ReelDrop{' Pro' if pro else ''}", supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
+            await update.message.reply_video(video=video_file, caption=f"✅ Download Complete\n\n🎬 Platform: {PLATFORM_NAMES[platform]}\n⚡ ReelDrop", supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
         await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
         try: await status.delete()
         except BadRequest: pass
@@ -186,10 +160,8 @@ def main() -> None:
     database.initialize()
     cleanup_old_temp_files(config.TEMP_DIR, config.TEMP_FILE_MAX_AGE_HOURS)
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
-    for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("admin", admin), ("makepro", makepro), ("removepro", removepro)):
+    for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("admin", admin)):
         app.add_handler(CommandHandler(command, callback))
-    app.add_handler(PreCheckoutQueryHandler(precheckout))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     if config.WEBHOOK_BASE_URL:
