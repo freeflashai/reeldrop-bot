@@ -198,16 +198,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("360p", callback_data="media:360"), InlineKeyboardButton("480p", callback_data="media:480")],
             [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p", callback_data="media:1080")],
-            [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio"), InlineKeyboardButton("📄 Original File", callback_data="media:file")],
+            [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio")],
             [InlineKeyboardButton("📝 Copy Caption", callback_data="media:caption")],
         ])
         await message.reply_text("🎬 Format choose karein:", reply_markup=keyboard)
         return
     plan = "free"
     quality = context.user_data.pop("selected_quality", None) or await asyncio.to_thread(database.get_video_quality, user_id)
-    send_mode = context.user_data.pop("send_mode", "video")
     await asyncio.to_thread(database.set_video_quality, user_id, quality)
-    cache_key = _cache_key(url, f"{send_mode}:{quality}")
+    cache_key = _cache_key(url, f"video:{quality}")
     cached = await asyncio.to_thread(database.get_cached_media, cache_key)
     cached_caption = f"✅ Download Complete\n\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop · instant cache"
     if cached and await _send_cached(message, cached, cached_caption):
@@ -227,12 +226,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 raise ReelDownloadError("Telegram file size limit exceeded")
             suffix = path.suffix.lower()
             is_photo = suffix in {".jpg", ".jpeg", ".png", ".webp"}
-            file_type = "document" if send_mode == "file" else ("photo" if is_photo else "video")
+            file_type = "photo" if is_photo else "video"
             item_caption = f"✅ Download Complete\n\n🎠 Item {index + 1}/{total_items}\n🎬 Instagram · up to {quality}p\n⚡ ReelDrop" if index == 0 else f"🎠 Item {index + 1}/{total_items}"
             with path.open("rb") as media_file:
-                if file_type == "document":
-                    sent = await message.reply_document(document=media_file, caption=item_caption, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
-                elif file_type == "photo":
+                if file_type == "photo":
                     sent = await message.reply_photo(photo=media_file, caption=item_caption, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
                 else:
                     sent = await message.reply_video(video=media_file, caption=item_caption, supports_streaming=True, read_timeout=120, write_timeout=120, connect_timeout=30, pool_timeout=30)
@@ -271,7 +268,7 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await query.edit_message_text("⌛ Ye selection expire ho gayi. Instagram link dobara bhejein.")
         return
     choice = (query.data or "").removeprefix("media:")
-    labels = {"audio": "MP3 Audio", "file": "Original File", "caption": "Caption"}
+    labels = {"audio": "MP3 Audio", "caption": "Caption"}
     await query.edit_message_text(f"✅ {labels.get(choice, choice + 'p')} selected")
     context.user_data["selected_url"] = url
     if choice == "audio":
@@ -290,12 +287,6 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         except ReelDownloadError:
             logger.exception("Caption extraction failed for user %s", update.effective_user.id)
             await update.effective_message.reply_text("⚠️ Caption fetch nahi ho paya.")
-        return
-    if choice == "file":
-        context.user_data["selected_quality"] = await asyncio.to_thread(database.get_video_quality, update.effective_user.id)
-        context.user_data["send_mode"] = "file"
-        context.user_data["choice_confirmed"] = True
-        await handle_message(update, context)
         return
     try:
         quality = int(choice)
@@ -320,7 +311,7 @@ def main() -> None:
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
     for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("quality", quality_command), ("audio", audio_command), ("admin", admin)):
         app.add_handler(CommandHandler(command, callback))
-    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio|file|caption)$"))
+    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio|caption)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     if config.WEBHOOK_BASE_URL:
