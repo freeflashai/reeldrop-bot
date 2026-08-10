@@ -91,6 +91,8 @@ def _classify_error(error: DownloadError, platform: str):
         return YouTubeNotPermittedError(str(error))
     if platform == "snapchat" and any(x in message for x in ("unsupported url", "no video formats")):
         return SnapchatUnsupportedError(str(error))
+    if "requested format is not available" in message:
+        return ReelDownloadError(str(error))
     if any(x in message for x in ("private", "login required", "not authorized", "restricted", "sign in")):
         return PrivateOrInaccessibleError(str(error))
     if any(x in message for x in ("not available", "unavailable", "removed", "does not exist", "404")):
@@ -104,7 +106,9 @@ def download_video(url: str, platform: str, quality_limit: int, temp_root: Path,
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
     options = {
-        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]",
+        # Some direct-video extractors (notably Snapchat) omit height metadata.
+        # Prefer the capped formats, then fall back to their original MP4/source.
+        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
         "outtmpl": str(request_dir / "video.%(ext)s"),
         "merge_output_format": "mp4",
         "noplaylist": True,

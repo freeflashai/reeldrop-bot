@@ -4,6 +4,8 @@ from pathlib import Path
 
 from database import Database
 from downloader import cleanup_old_temp_files, delete_request_files, detect_platform, extract_url
+from platforms import ReelDownloadError, VideoUnavailableError, _classify_error
+from yt_dlp.utils import DownloadError
 
 
 class PlatformTests(unittest.TestCase):
@@ -17,6 +19,12 @@ class PlatformTests(unittest.TestCase):
 
     def test_extract_url(self):
         self.assertEqual(extract_url("see https://youtu.be/abc)."), "https://youtu.be/abc")
+
+    def test_missing_format_is_not_reported_as_deleted(self):
+        error = DownloadError("Requested format is not available")
+        classified = _classify_error(error, "snapchat")
+        self.assertIs(type(classified), ReelDownloadError)
+        self.assertNotIsInstance(classified, VideoUnavailableError)
 
 
 class DatabaseTests(unittest.TestCase):
