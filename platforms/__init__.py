@@ -124,6 +124,41 @@ def download_video(url: str, platform: str, quality_limit: int, temp_root: Path,
         raise ReelDownloadError(str(error)) from error
 
 
+def download_audio(url: str, platform: str, temp_root: Path, user_id: int) -> DownloadResult:
+    """Extract an MP3 from a supported public video using FFmpeg."""
+    if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
+        raise UnsupportedUrlError("Unsupported URL")
+    request_dir = temp_root / str(user_id) / uuid4().hex
+    request_dir.mkdir(parents=True, exist_ok=False)
+    options = {
+        "format": "bestaudio/best",
+        "outtmpl": str(request_dir / "audio.%(ext)s"),
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "restrictfilenames": True,
+        "overwrites": True,
+        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}],
+    }
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=True)
+        mp3 = request_dir / "audio.mp3"
+        files = [mp3] if mp3.is_file() else list(request_dir.glob("*.mp3"))
+        if not files:
+            raise ReelDownloadError("Audio extraction produced no MP3")
+        return DownloadResult(files[0], request_dir, info.get("title"))
+    except DownloadError as error:
+        delete_request_files(request_dir)
+        raise _classify_error(error, platform) from error
+    except ReelDownloadError:
+        delete_request_files(request_dir)
+        raise
+    except Exception as error:
+        delete_request_files(request_dir)
+        raise ReelDownloadError(str(error)) from error
+
+
 def delete_request_files(request_dir: Path | None) -> None:
     if request_dir and request_dir.exists():
         shutil.rmtree(request_dir, ignore_errors=True)

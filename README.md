@@ -15,6 +15,13 @@ Only parsed HTTP/HTTPS URLs on `instagram.com` are accepted. The bot rejects oth
 
 All supported Instagram content is free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` only confirms that the bot is free; it never opens a payment invoice. The bot never upscales video.
 
+## Audio Extraction and Quality Selection
+
+- `/audio <Instagram link>` extracts 192 kbps MP3 audio using FFmpeg and sends it directly in Telegram.
+- `/quality 360`, `/quality 480`, `/quality 720`, or `/quality 1080` saves the user's preferred maximum video resolution.
+- `/quality` without a value shows the current setting.
+- If the selected resolution is unavailable, ReelDrop sends the best available lower/source quality and never upscales.
+
 ## Public Content Limitations
 
 ReelDrop does not bypass Instagram login, private accounts, expired Stories, inaccessible Live sessions, DRM, or other access controls. No cookies or credentials are accepted or harvested. Story and Live support depends on public accessibility and yt-dlp extractor support at request time.
@@ -52,7 +59,7 @@ Install Python, FFmpeg, and the requirements; copy the project and `.env`; then 
 
 ## Database and Temporary Files
 
-Startup safely adds missing `platform`, `requested_quality`, `plan`, and `pro_until` fields without deleting records. Each job uses `temp/<user_id>/<request_uuid>/`. Its files are removed after success or any failure, and stale files are cleaned at startup.
+Startup safely adds missing download analytics fields and the user's `video_quality` preference without deleting records. Each job uses `temp/<user_id>/<request_uuid>/`. Video and extracted MP3 files are removed after success or any failure, and stale files are cleaned at startup.
 
 ## Testing
 

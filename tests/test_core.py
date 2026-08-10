@@ -54,6 +54,10 @@ class DatabaseTests(unittest.TestCase):
             self.assertEqual(db.user_stats(7), (1, {"facebook": 1}))
             db.set_pro(7, 30); self.assertTrue(db.is_pro(7))
             db.remove_pro(7); self.assertFalse(db.is_pro(7))
+            self.assertEqual(db.get_video_quality(7), 1080)
+            db.set_video_quality(7, 480)
+            self.assertEqual(db.get_video_quality(7), 480)
+            with self.assertRaises(ValueError): db.set_video_quality(7, 999)
 
     def test_temp_cleanup(self):
         with tempfile.TemporaryDirectory() as folder:

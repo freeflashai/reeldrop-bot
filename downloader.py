@@ -9,6 +9,7 @@ from platforms import (  # noqa: F401
     cleanup_old_temp_files,
     delete_request_files,
     detect_platform,
+    download_audio,
     download_video,
     extract_url,
 )

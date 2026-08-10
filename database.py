@@ -41,6 +41,7 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_downloads_user_time ON downloads (telegram_user_id, timestamp);
             """)
             self._add_column(connection, "users", "pro_until", "TEXT")
+            self._add_column(connection, "users", "video_quality", "INTEGER NOT NULL DEFAULT 1080")
             self._add_column(connection, "downloads", "platform", "TEXT NOT NULL DEFAULT 'instagram'")
             self._add_column(connection, "downloads", "requested_quality", "INTEGER")
             self._add_column(connection, "downloads", "plan", "TEXT NOT NULL DEFAULT 'free'")
@@ -54,6 +55,20 @@ class Database:
     def ensure_user(self, user_id: int) -> None:
         with self._lock, self._connection() as connection:
             connection.execute("INSERT OR IGNORE INTO users (telegram_user_id, first_seen) VALUES (?, ?)", (user_id, datetime.now(timezone.utc).isoformat()))
+
+    def get_video_quality(self, user_id: int) -> int:
+        self.ensure_user(user_id)
+        with self._lock, self._connection() as connection:
+            row = connection.execute("SELECT video_quality FROM users WHERE telegram_user_id=?", (user_id,)).fetchone()
+        quality = int(row["video_quality"] or 1080)
+        return quality if quality in {360, 480, 720, 1080} else 1080
+
+    def set_video_quality(self, user_id: int, quality: int) -> None:
+        if quality not in {360, 480, 720, 1080}:
+            raise ValueError("Unsupported video quality")
+        self.ensure_user(user_id)
+        with self._lock, self._connection() as connection:
+            connection.execute("UPDATE users SET video_quality=? WHERE telegram_user_id=?", (quality, user_id))
 
     def is_pro(self, user_id: int) -> bool:
         with self._lock, self._connection() as connection:
