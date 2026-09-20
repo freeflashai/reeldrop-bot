@@ -3,7 +3,8 @@
 import asyncio
 import hashlib
 import logging
-from urllib.parse import parse_qs, urlsplit, urlunsplit
+from urllib.parse import parse_qs, quote, urlsplit, urlunsplit
+
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, Forbidden, NetworkError, TelegramError
@@ -194,23 +195,26 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         if not video_id:
             await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
             return
-        yt_url = f"https://www.youtube.com/watch?v={video_id}"
+        encoded_yt = quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✨ Cobalt MP3 (No Ads · Auto Load)", url=f"https://cobalt.tools/#{yt_url}")],
-            [InlineKeyboardButton("🎵 Dirpy MP3 Studio", url=f"https://dirpy.com/studio?url={yt_url}")],
-            [InlineKeyboardButton("📥 SaveFrom Server", url=f"https://ssyoutube.com/watch?v={video_id}")],
+            [InlineKeyboardButton("🚀 1-Click MP3 Download (Auto)", url=f"https://p.savenow.to/api/button/?url={encoded_yt}&f=mp3")],
+            [InlineKeyboardButton("🎵 YTMP3 (Instant MP3 Converter)", url="https://ytmp3.nu/en/")],
+            [InlineKeyboardButton("⚡ YT1s MP3 Studio", url="https://yt1s.com.co/en1/youtube-to-mp3/")],
         ])
-        await message.reply_text(
-            "🎵 YouTube Audio (MP3)\n\n"
-            "Instant MP3 download ke liye niche diye verified buttons par tap karein:\n\n"
-            "1️⃣ ✨ Cobalt (No Ads · Auto-fill)\n"
-            "2️⃣ 🎵 Dirpy MP3 Studio (Direct MP3)\n"
-            "3️⃣ 📥 SaveFrom (Backup Server)\n\n"
-            "👇 Click button to download:",
+        await message.reply_html(
+            "🎵 <b>YouTube Audio (MP3)</b>\n\n"
+            "Instant MP3 download ke liye verified unblocked servers use karein:\n\n"
+            f"📋 <b>Link (Tap to copy):</b>\n"
+            f"<code>https://www.youtube.com/watch?v={video_id}</code>\n\n"
+            "1️⃣ 🚀 1-Click MP3 Download (Direct auto-convert)\n"
+            "2️⃣ 🎵 YTMP3 (Clean & Fast MP3)\n"
+            "3️⃣ ⚡ YT1s MP3 Studio (High quality 320kbps)\n\n"
+            "👇 Choose server:",
             reply_markup=keyboard,
         )
         await asyncio.to_thread(database.record_download, user_id, "success", "youtube", None, "free")
         return
+
 
     cache_key = _cache_key(url, "audio:mp3:192")
 
@@ -323,24 +327,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if not video_id:
             await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
             return
-        yt_url = f"https://www.youtube.com/watch?v={video_id}"
+        encoded_yt = quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✨ Cobalt (No Ads · Auto-fill Link)", url=f"https://cobalt.tools/#{yt_url}")],
-            [InlineKeyboardButton("🎬 Dirpy Studio (HD Video & MP3)", url=f"https://dirpy.com/studio?url={yt_url}")],
-            [InlineKeyboardButton("📥 SaveFrom Server (Backup)", url=f"https://ssyoutube.com/watch?v={video_id}")],
+            [InlineKeyboardButton("🚀 1-Click Fast Download (Auto)", url=f"https://p.savenow.to/api/button/?url={encoded_yt}&f=mp4")],
+            [InlineKeyboardButton("🎬 YT1s Downloader (1080p · 720p · MP3)", url="https://yt1s.com.co/en1/")],
+            [InlineKeyboardButton("🎵 YTMP3 Converter (Fast Video/Audio)", url="https://ytmp3.nu/en/")],
         ])
-        await message.reply_text(
-            "🔴 YouTube Video Ready!\n\n"
-            "Niche diye gaye verified servers se 1-click me download karein:\n\n"
-            "1️⃣ ✨ Cobalt (100% No Ads · Link automatically load ho jayegi)\n"
-            "2️⃣ 🎬 Dirpy Studio (Direct HD Video / MP3 Recorder)\n"
-            "3️⃣ 📥 SaveFrom (Tested & working server)\n\n"
-            "💡 Tip: Cobalt sabse clean aur ad-free hai!\n\n"
+        await message.reply_html(
+            "🔴 <b>YouTube Video Ready!</b>\n\n"
+            "⚡ Niche diye gaye 100% verified unblocked servers se download karein:\n\n"
+            f"📋 <b>Video Link (Tap to copy):</b>\n"
+            f"<code>https://www.youtube.com/watch?v={video_id}</code>\n\n"
+            "1️⃣ 🚀 1-Click Fast Download (Direct auto-convert)\n"
+            "2️⃣ 🎬 YT1s (Free 1080p, 720p HD & MP3 · Unblocked in India)\n"
+            "3️⃣ 🎵 YTMP3 (Instant Fast Converter)\n\n"
+            "💡 <i>Tip: Link par tap karte hi copy ho jayegi. YT1s ya YTMP3 par 1-tap paste karke direct download karein!</i>\n\n"
             "👇 Choose server:",
             reply_markup=keyboard,
         )
         await asyncio.to_thread(database.record_download, user_id, "success", "youtube", 1080, "free")
         return
+
 
     if not context.user_data.pop("choice_confirmed", False):
 
