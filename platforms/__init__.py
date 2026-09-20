@@ -119,21 +119,36 @@ def _classify_error(error: DownloadError, platform: str):
     return ReelDownloadError(str(error))
 
 
-def download_video(url: str, platform: str, quality_limit: int, temp_root: Path, user_id: int) -> DownloadResult:
-    if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
-        raise UnsupportedUrlError("Unsupported URL")
-    request_dir = temp_root / str(user_id) / uuid4().hex
-    request_dir.mkdir(parents=True, exist_ok=False)
+def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
     options = {
-        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality_limit}]+bestaudio/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
-        "outtmpl": str(request_dir / "video.%(ext)s"),
-        "merge_output_format": "mp4",
-        "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
         "restrictfilenames": True,
         "overwrites": True,
     }
+    if platform == "youtube":
+        options["extractor_args"] = {
+            "youtube": {
+                "player_client": ["android_vr", "android", "web"],
+                "player_skip": ["webpage", "configs"],
+            }
+        }
+    if extra:
+        options.update(extra)
+    return options
+
+
+def download_video(url: str, platform: str, quality_limit: int, temp_root: Path, user_id: int) -> DownloadResult:
+    if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
+        raise UnsupportedUrlError("Unsupported URL")
+    request_dir = temp_root / str(user_id) / uuid4().hex
+    request_dir.mkdir(parents=True, exist_ok=False)
+    options = _get_ydl_options(platform, {
+        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality_limit}]+bestaudio/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
+        "outtmpl": str(request_dir / "video.%(ext)s"),
+        "merge_output_format": "mp4",
+        "noplaylist": True,
+    })
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -163,16 +178,12 @@ def download_media_collection(url: str, platform: str, quality_limit: int, temp_
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
     noplaylist = (platform != "instagram")
-    options = {
+    options = _get_ydl_options(platform, {
         "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality_limit}]+bestaudio/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
         "outtmpl": str(request_dir / "%(playlist_index|0)03d_%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
         "noplaylist": noplaylist,
-        "quiet": True,
-        "no_warnings": True,
-        "restrictfilenames": True,
-        "overwrites": True,
-    }
+    })
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -201,7 +212,11 @@ def get_metadata(url: str, platform: str) -> dict:
         raise UnsupportedUrlError("Unsupported URL")
     try:
         noplaylist = (platform != "instagram")
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": noplaylist}) as ydl:
+        options = _get_ydl_options(platform, {
+            "skip_download": True,
+            "noplaylist": noplaylist,
+        })
+        with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=False)
         entries = info.get("entries") or []
         first = next((entry for entry in entries if entry), info)
@@ -216,16 +231,12 @@ def download_audio(url: str, platform: str, temp_root: Path, user_id: int) -> Do
         raise UnsupportedUrlError("Unsupported URL")
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
-    options = {
+    options = _get_ydl_options(platform, {
         "format": "bestaudio/best",
         "outtmpl": str(request_dir / "audio.%(ext)s"),
         "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "restrictfilenames": True,
-        "overwrites": True,
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}],
-    }
+    })
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=True)
