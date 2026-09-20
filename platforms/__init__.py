@@ -12,6 +12,8 @@ from uuid import uuid4
 import yt_dlp
 from yt_dlp.utils import DownloadError
 
+import config
+
 from .facebook import is_supported_facebook_url
 from .instagram import is_supported_instagram_url
 from .snapchat import is_supported_snapchat_url
@@ -112,6 +114,8 @@ def _classify_error(error: DownloadError, platform: str):
     message = str(error).lower()
     if "requested format is not available" in message:
         return ReelDownloadError(str(error))
+    if "sign in to confirm you're not a bot" in message or "sign in to confirm you’re not a bot" in message:
+        return ReelDownloadError("YouTube ne cloud server ko block kiya ('Sign in to confirm you are not a bot'). YOUTUBE_COOKIES configure karein.")
     if any(x in message for x in ("private", "login required", "not authorized", "restricted", "sign in")):
         return PrivateOrInaccessibleError(str(error))
     if any(x in message for x in ("not available", "unavailable", "removed", "does not exist", "404")):
@@ -126,6 +130,8 @@ def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
         "restrictfilenames": True,
         "overwrites": True,
     }
+    if config.COOKIE_FILE.exists():
+        options["cookiefile"] = str(config.COOKIE_FILE)
     if platform == "youtube":
         options["extractor_args"] = {
             "youtube": {
