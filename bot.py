@@ -427,7 +427,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("360p", callback_data="media:360"), InlineKeyboardButton("480p", callback_data="media:480")],
             [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p (Full HD)", callback_data="media:1080")],
-            [InlineKeyboardButton("💾 Save to Laptop (Full HD / No 50MB Limit)", callback_data="media:laptop")],
             [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio")],
             [InlineKeyboardButton("📝 Copy Caption", callback_data="media:caption")],
         ])
