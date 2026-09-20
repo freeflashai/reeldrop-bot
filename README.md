@@ -1,6 +1,6 @@
 # ReelDrop Bot
 
-ReelDrop is a completely free, unlimited multi-platform downloader Telegram bot. It accepts supported public **Instagram**, **YouTube**, **Facebook**, and **Snapchat** links, sends the video or extracted MP3 audio directly in Telegram, records analytics in SQLite, and cleans up request files automatically.
+ReelDrop is a completely free, unlimited multi-platform downloader Telegram bot. It accepts supported public **Instagram**, **Facebook**, and **Snapchat** links, sends the video or extracted MP3 audio directly in Telegram, records analytics in SQLite, and cleans up request files automatically.
 
 ## Supported Platforms & Content
 
@@ -9,11 +9,6 @@ ReelDrop is a completely free, unlimited multi-platform downloader Telegram bot.
 - Public video & carousel posts (`/p/`, `/tv/`)
 - Public, unexpired Stories (`/stories/<username>/<id>`)
 - Public, currently accessible Live URLs (`/<username>/live`)
-
-### 🔴 YouTube
-- YouTube Shorts (`/shorts/<id>`)
-- Standard YouTube Videos (`/watch?v=<id>`, `/v/<id>`, `/embed/<id>`)
-- Shortlinks (`youtu.be/<id>`)
 
 ### 👥 Facebook
 - Public Reels (`/reel/<id>`, `/share/r/<id>/`)
@@ -73,7 +68,7 @@ FFmpeg is required when yt-dlp merges video and audio or extracts MP3. On Window
 
 ## Admin Analytics
 
-`/admin` shows successful totals, today's successes, registered users, and download breakdowns by platform (Instagram, YouTube, Facebook, Snapchat). `/mystats` shows the user's total and platform breakdown.
+`/admin` shows successful totals, today's successes, registered users, and download breakdowns by platform (Instagram, Facebook, Snapchat). `/mystats` shows the user's total and platform breakdown.
 
 ## Testing
 

@@ -7,8 +7,6 @@ from database import Database
 from downloader import cleanup_old_temp_files, delete_request_files, detect_platform, extract_url, is_supported_url
 from platforms import ReelDownloadError, VideoUnavailableError, _classify_error
 from platforms.instagram import is_supported_instagram_url
-from platforms.youtube import extract_youtube_video_id, is_supported_youtube_url
-
 from platforms.facebook import is_supported_facebook_url
 from platforms.snapchat import is_supported_snapchat_url
 from bot import _has_channel_access, _cache_key
@@ -29,9 +27,6 @@ class PlatformTests(unittest.TestCase):
             "https://instagram.com/reel/x": "instagram",
             "https://instagram.com/stories/user.name/123456": "instagram",
             "https://instagram.com/user.name/live/": "instagram",
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "youtube",
-            "https://youtu.be/dQw4w9WgXcQ": "youtube",
-            "https://youtube.com/shorts/abcdef12345": "youtube",
             "https://www.facebook.com/reel/123456789": "facebook",
             "https://fb.watch/abcdef/": "facebook",
             "https://www.snapchat.com/spotlight/abcdef": "snapchat",
@@ -46,8 +41,14 @@ class PlatformTests(unittest.TestCase):
             "https://twitter.com/user/status/123456",
             "https://x.com/user/status/123456",
             "https://vimeo.com/123456",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://youtube.com/shorts/abcdef12345",
         ):
             self.assertEqual(detect_platform(url), "unsupported", url)
+            valid, platform = is_supported_url(url)
+            self.assertFalse(valid, url)
+            self.assertEqual(platform, "unsupported", url)
 
     def test_supported_instagram_content_paths(self):
         urls = (
@@ -61,33 +62,6 @@ class PlatformTests(unittest.TestCase):
             valid, platform = is_supported_url(url)
             self.assertTrue(valid)
             self.assertEqual(platform, "instagram")
-
-    def test_supported_youtube_content_paths(self):
-        urls = (
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            "https://m.youtube.com/watch?v=dQw4w9WgXcQ&feature=share",
-            "https://youtu.be/dQw4w9WgXcQ",
-            "https://youtube.com/shorts/123456abcdef",
-        )
-        for url in urls:
-            self.assertTrue(is_supported_youtube_url(url), url)
-            valid, platform = is_supported_url(url)
-            self.assertTrue(valid)
-            self.assertEqual(platform, "youtube")
-
-    def test_extract_youtube_video_id(self):
-        cases = {
-            "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "dQw4w9WgXcQ",
-            "https://m.youtube.com/watch?v=dQw4w9WgXcQ&feature=share": "dQw4w9WgXcQ",
-            "https://youtu.be/dQw4w9WgXcQ": "dQw4w9WgXcQ",
-            "https://youtu.be/dQw4w9WgXcQ?si=12345": "dQw4w9WgXcQ",
-            "https://youtube.com/shorts/123456abcdef": "123456abcdef",
-            "https://youtube.com/shorts/123456abcdef?feature=share": "123456abcdef",
-            "https://www.youtube.com/embed/dQw4w9WgXcQ": "dQw4w9WgXcQ",
-            "https://instagram.com/reel/123456": None,
-        }
-        for url, expected in cases.items():
-            self.assertEqual(extract_youtube_video_id(url), expected, url)
 
 
     def test_supported_facebook_content_paths(self):
@@ -157,12 +131,12 @@ class DatabaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             db = Database(Path(folder) / "test.db"); db.initialize()
             db.record_download(7, "success", "facebook", 720, "free")
-            db.record_download(7, "success", "youtube", 1080, "free")
+            db.record_download(7, "success", "instagram", 1080, "free")
             db.record_download(7, "success", "snapchat", 720, "free")
             total, breakdown = db.user_stats(7)
             self.assertEqual(total, 3)
             self.assertEqual(breakdown.get("facebook"), 1)
-            self.assertEqual(breakdown.get("youtube"), 1)
+            self.assertEqual(breakdown.get("instagram"), 1)
             self.assertEqual(breakdown.get("snapchat"), 1)
             db.set_pro(7, 30); self.assertTrue(db.is_pro(7))
             db.remove_pro(7); self.assertFalse(db.is_pro(7))

@@ -19,8 +19,8 @@ from downloader import (
     delete_request_files,
     download_audio,
     download_video,
-    extract_youtube_video_id,
     get_metadata,
+    is_supported_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,26 +87,26 @@ async def health():
 
 
 @app.get("/api/info")
-async def video_info(v: str = Query(..., description="YouTube video ID or URL")):
+async def video_info(url: str = Query(..., description="Supported video URL (Instagram, Facebook, Snapchat)")):
     """Fetch video preview metadata."""
-    video_id = extract_youtube_video_id(v) or v
-    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    is_valid, platform = is_supported_url(url)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Unsupported platform URL")
     try:
-        data = await asyncio.to_thread(get_metadata, youtube_url, "youtube")
+        data = await asyncio.to_thread(get_metadata, url, platform)
         return {
-            "id": video_id,
-            "title": data.get("title") or "YouTube Video",
-            "thumbnail": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            "platform": platform,
+            "title": data.get("title") or "Video",
             "qualities": ["1080", "720", "480", "360", "mp3"],
         }
     except Exception as e:
-        logger.exception("Metadata fetch failed for %s", video_id)
+        logger.exception("Metadata fetch failed for %s", url)
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/download")
 async def download_media(
-    v: str = Query(..., description="YouTube video ID or URL"),
+    url: str = Query(..., description="Supported video URL (Instagram, Facebook, Snapchat)"),
     f: str = Query("720", description="Quality format: 1080, 720, 480, 360, mp3"),
     background_tasks: BackgroundTasks = None,
 ):
@@ -114,13 +114,14 @@ async def download_media(
     1-Click direct file download endpoint.
     Returns FileResponse with Content-Disposition: attachment so browser downloads directly.
     """
-    video_id = extract_youtube_video_id(v) or v
-    youtube_url = f"https://www.youtube.com/watch?v={video_id}"
+    is_valid, platform = is_supported_url(url)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Unsupported platform URL")
     req_user_id = int(str(uuid4().int)[:8])
 
     try:
         if f.lower() == "mp3":
-            result = await asyncio.to_thread(download_audio, youtube_url, "youtube", config.TEMP_DIR, req_user_id)
+            result = await asyncio.to_thread(download_audio, url, platform, config.TEMP_DIR, req_user_id)
             media_type = "audio/mpeg"
             ext = "mp3"
         else:
@@ -128,14 +129,14 @@ async def download_media(
                 quality = int(f)
             except ValueError:
                 quality = 720
-            result = await asyncio.to_thread(download_video, youtube_url, "youtube", quality, config.TEMP_DIR, req_user_id)
+            result = await asyncio.to_thread(download_video, url, platform, quality, config.TEMP_DIR, req_user_id)
             media_type = "video/mp4"
             ext = "mp4"
 
         if background_tasks:
             background_tasks.add_task(delete_request_files, result.request_dir)
 
-        safe_title = re.sub(r'[^\w\s.-]', '', result.title or f"youtube_{video_id}").strip() or f"video_{video_id}"
+        safe_title = re.sub(r'[^\w\s.-]', '', result.title or f"{platform}_media").strip() or f"{platform}_media"
         filename = f"{safe_title}.{ext}"
 
         return FileResponse(
@@ -144,7 +145,7 @@ async def download_media(
             filename=filename,
         )
     except Exception as e:
-        logger.exception("Download failed for %s (format: %s)", video_id, f)
+        logger.exception("Download failed for %s (format: %s)", url, f)
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 

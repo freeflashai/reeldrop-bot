@@ -17,21 +17,18 @@ import config
 from .facebook import is_supported_facebook_url
 from .instagram import is_supported_instagram_url
 from .snapchat import is_supported_snapchat_url
-from .youtube import extract_youtube_video_id, is_supported_youtube_url
 
 
 logger = logging.getLogger(__name__)
 
 PLATFORM_HOSTS = {
     "instagram": {"instagram.com", "www.instagram.com"},
-    "youtube": {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"},
     "facebook": {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch"},
     "snapchat": {"snapchat.com", "www.snapchat.com", "story.snapchat.com"},
 }
 
 PLATFORM_VALIDATORS = {
     "instagram": is_supported_instagram_url,
-    "youtube": is_supported_youtube_url,
     "facebook": is_supported_facebook_url,
     "snapchat": is_supported_snapchat_url,
 }
@@ -115,8 +112,6 @@ def _classify_error(error: DownloadError, platform: str):
     message = str(error).lower()
     if "requested format is not available" in message:
         return ReelDownloadError(str(error))
-    if "sign in to confirm you're not a bot" in message or "sign in to confirm you’re not a bot" in message:
-        return ReelDownloadError("YouTube ne cloud server ko block kiya ('Sign in to confirm you are not a bot'). YOUTUBE_COOKIES configure karein.")
     if any(x in message for x in ("private", "login required", "not authorized", "restricted", "sign in")):
         return PrivateOrInaccessibleError(str(error))
     if any(x in message for x in ("not available", "unavailable", "removed", "does not exist", "404")):
@@ -133,14 +128,6 @@ def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
     }
     if config.COOKIE_FILE.exists() and config.COOKIE_FILE.stat().st_size > 10:
         options["cookiefile"] = str(config.COOKIE_FILE)
-    if platform == "youtube":
-        options["extractor_args"] = {
-            "youtube": {
-                "player_client": ["android"],
-            }
-        }
-    if config.YOUTUBE_PROXY and platform == "youtube":
-        options["proxy"] = config.YOUTUBE_PROXY
     if extra:
         options.update(extra)
     return options

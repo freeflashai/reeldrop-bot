@@ -20,7 +20,7 @@ from database import Database, PLATFORMS
 from downloader import (PrivateOrInaccessibleError, ReelDownloadError,
                         UnsupportedUrlError, VideoUnavailableError,
                         cleanup_old_temp_files, delete_request_files, detect_platform, download_audio,
-                        download_media_collection, extract_url, extract_youtube_video_id, get_metadata, is_supported_url)
+                        download_media_collection, extract_url, get_metadata, is_supported_url)
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -32,17 +32,15 @@ download_semaphore = asyncio.Semaphore(config.MAX_CONCURRENT_DOWNLOADS)
 
 PLATFORM_NAMES = {
     "instagram": "Instagram",
-    "youtube": "YouTube",
     "facebook": "Facebook",
     "snapchat": "Snapchat",
 }
 
 WELCOME_TEXT = """👋 Welcome to ReelDrop
  
-📸 Instagram · 🔴 YouTube · 👥 Facebook · 👻 Snapchat
+📸 Instagram · 👥 Facebook · 👻 Snapchat
  
 🎬 Instagram Reels, Video posts, Stories & Live
-🔴 YouTube Shorts & Videos (360p, 480p, 720p, 1080p & MP3)
 👥 Facebook Reels & Watch videos
 👻 Snapchat Spotlight & Stories
  
@@ -50,7 +48,7 @@ WELCOME_TEXT = """👋 Welcome to ReelDrop
 ⚙️ /quality 360|480|720|1080
  
 📊 Live download progress percentage (%)
-💾 50MB+ large files & Full HD videos seedhe laptop me save hote hain!
+💾 50MB+ large files seedhe downloads folder me save hote hain!
  
 🔗 Bas supported video link bhejo 👇"""
 
@@ -254,9 +252,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         await update.message.reply_text(
-            "Supported platforms: Instagram, YouTube, Facebook, Snapchat.\n\n"
+            "Supported platforms: Instagram, Facebook, Snapchat.\n\n"
             "• Instagram: Reels, video posts, Stories, Live\n"
-            "• YouTube: Shorts & standard videos\n"
             "• Facebook: Reels, Watch & video posts\n"
             "• Snapchat: Spotlight & Stories\n\n"
             "Bas supported link bhejein. Bot bilkul free aur unlimited hai.\n"
@@ -295,11 +292,11 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     user_id = update.effective_user.id
     url = context.user_data.pop("selected_url", None) or extract_url(" ".join(context.args))
     if not url:
-        await message.reply_text("❌ Use: /audio <supported link (Instagram, YouTube, Facebook, Snapchat)>")
+        await message.reply_text("❌ Use: /audio <supported link (Instagram, Facebook, Snapchat)>")
         return
     is_valid, platform = is_supported_url(url)
     if not is_valid:
-        await message.reply_text("❌ Use: /audio <supported link (Instagram, YouTube, Facebook, Snapchat)>")
+        await message.reply_text("❌ Use: /audio <supported link (Instagram, Facebook, Snapchat)>")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
     cache_key = _cache_key(url, "audio:mp3:192")
@@ -420,7 +417,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     is_valid, platform = is_supported_url(url)
     if not is_valid:
-        await message.reply_text("❌ Sirf supported Instagram, YouTube, Facebook ya Snapchat link bhejein.")
+        await message.reply_text("❌ Sirf supported Instagram, Facebook ya Snapchat link bhejein.")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
     if not context.user_data.pop("choice_confirmed", False):

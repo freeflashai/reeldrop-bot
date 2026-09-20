@@ -38,11 +38,6 @@ MAX_TELEGRAM_FILE_SIZE_MB = int(os.getenv("MAX_TELEGRAM_FILE_SIZE_MB", "49"))
 MAX_TELEGRAM_FILE_SIZE_BYTES = MAX_TELEGRAM_FILE_SIZE_MB * 1024 * 1024
 TEMP_FILE_MAX_AGE_HOURS = int(os.getenv("TEMP_FILE_MAX_AGE_HOURS", "24"))
 COOKIE_FILE = BASE_DIR / "cookies.txt"
-YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "").strip()
-if YOUTUBE_COOKIES:
-    COOKIE_FILE.write_text(YOUTUBE_COOKIES, encoding="utf-8")
-
-YOUTUBE_PROXY = os.getenv("YOUTUBE_PROXY", "").strip()
 
 WEB_DOWNLOADER_URL = os.getenv("WEB_DOWNLOADER_URL", "https://reel-drop-downloder.web.app").strip().rstrip("/")
 

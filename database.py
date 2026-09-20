@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 
-PLATFORMS = ("instagram", "facebook", "snapchat", "youtube")
+PLATFORMS = ("instagram", "facebook", "snapchat")
 
 
 class Database:
