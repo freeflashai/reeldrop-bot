@@ -129,8 +129,7 @@ def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
     if platform == "youtube":
         options["extractor_args"] = {
             "youtube": {
-                "player_client": ["android_vr", "android", "web"],
-                "player_skip": ["webpage", "configs"],
+                "player_client": ["android_vr", "web"],
             }
         }
     if extra:
