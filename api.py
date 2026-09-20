@@ -46,8 +46,8 @@ async def lifespan(app: FastAPI):
             logger.info("Setting Telegram webhook to: %s", webhook_url)
             await telegram_app.bot.set_webhook(
                 url=webhook_url,
-                secret_token=config.WEBHOOK_SECRET_TOKEN or None,
                 allowed_updates=Update.ALL_TYPES,
+                drop_pending_updates=False,
             )
         else:
             logger.info("WEBHOOK_BASE_URL not set; API running in standalone mode")
@@ -56,11 +56,6 @@ async def lifespan(app: FastAPI):
 
     if telegram_app:
         logger.info("Shutting down Telegram Bot...")
-        try:
-            if config.WEBHOOK_BASE_URL:
-                await telegram_app.bot.delete_webhook()
-        except Exception:
-            pass
         await telegram_app.stop()
         await telegram_app.shutdown()
 
@@ -157,12 +152,8 @@ async def download_media(
 async def telegram_webhook(request: Request):
     """Receive Telegram webhook updates."""
     if not telegram_app:
+        logger.warning("Telegram app not initialized when update arrived")
         return Response(status_code=503)
-
-    if config.WEBHOOK_SECRET_TOKEN:
-        token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if token != config.WEBHOOK_SECRET_TOKEN:
-            return Response(status_code=403)
 
     try:
         data = await request.json()
