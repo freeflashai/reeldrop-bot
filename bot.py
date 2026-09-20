@@ -190,6 +190,24 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await message.reply_text("❌ Use: /audio <supported link (Instagram, YouTube, Facebook, Snapchat)>")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
+    if platform == "youtube":
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
+            return
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 ReelDrop Web (1-Click MP3)", url=f"{config.WEB_DOWNLOADER_URL}/?v={video_id}&f=mp3")],
+        ])
+        await message.reply_html(
+            "🎵 <b>YouTube Audio (MP3)</b>\n\n"
+            "Hamari official ReelDrop website se 1-Click me MP3 download karein:\n\n"
+            f"📋 <b>Video:</b> <code>https://www.youtube.com/watch?v={video_id}</code>\n\n"
+            "👇 <b>Niche click karein:</b>",
+            reply_markup=keyboard,
+        )
+        await asyncio.to_thread(database.record_download, user_id, "success", "youtube", None, "free")
+        return
+
     cache_key = _cache_key(url, "audio:mp3:192")
 
     cached = await asyncio.to_thread(database.get_cached_media, cache_key)
@@ -296,6 +314,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await message.reply_text("❌ Sirf supported Instagram, YouTube, Facebook ya Snapchat link bhejein.")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
+    if platform == "youtube":
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
+            return
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌐 ReelDrop Web (1-Click Download)", url=f"{config.WEB_DOWNLOADER_URL}/?v={video_id}")],
+        ])
+        await message.reply_html(
+            "🔴 <b>YouTube Video Ready!</b>\n\n"
+            "🎬 Hamari official ReelDrop website se 1-Click me video download karein:\n\n"
+            f"📋 <b>Video:</b> <code>https://www.youtube.com/watch?v={video_id}</code>\n\n"
+            "👇 <b>Niche diye gaye button par click karein:</b>",
+            reply_markup=keyboard,
+        )
+        await asyncio.to_thread(database.record_download, user_id, "success", "youtube", 1080, "free")
+        return
 
     if not context.user_data.pop("choice_confirmed", False):
 
