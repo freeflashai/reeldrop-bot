@@ -456,21 +456,40 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def error_handler(update, context): logger.error("Unhandled Telegram update error", exc_info=context.error)
 
 
-def main() -> None:
+def build_bot_app() -> Application:
     if not config.TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is missing")
-    database.initialize()
-    cleanup_old_temp_files(config.TEMP_DIR, config.TEMP_FILE_MAX_AGE_HOURS)
     app = Application.builder().token(config.TELEGRAM_BOT_TOKEN).build()
-    for command, callback in (("start", start), ("help", help_command), ("stats", mystats), ("mystats", mystats), ("upgrade", upgrade), ("quality", quality_command), ("audio", audio_command), ("admin", admin)):
+    for command, callback in (
+        ("start", start),
+        ("help", help_command),
+        ("stats", mystats),
+        ("mystats", mystats),
+        ("upgrade", upgrade),
+        ("quality", quality_command),
+        ("audio", audio_command),
+        ("admin", admin),
+    ):
         app.add_handler(CommandHandler(command, callback))
     app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio|caption)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
+    return app
+
+
+def main() -> None:
+    database.initialize()
+    cleanup_old_temp_files(config.TEMP_DIR, config.TEMP_FILE_MAX_AGE_HOURS)
+
     if config.WEBHOOK_BASE_URL:
-        app.run_webhook(listen="0.0.0.0", port=config.PORT, url_path="telegram-webhook", webhook_url=f"{config.WEBHOOK_BASE_URL}/telegram-webhook", secret_token=config.WEBHOOK_SECRET_TOKEN or None, allowed_updates=Update.ALL_TYPES)
+        import uvicorn
+        logger.info("Starting combined FastAPI & Telegram Webhook server on port %s", config.PORT)
+        uvicorn.run("api:app", host="0.0.0.0", port=config.PORT, log_level="info")
     else:
+        logger.info("Starting Telegram bot in polling mode")
+        app = build_bot_app()
         app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main()
