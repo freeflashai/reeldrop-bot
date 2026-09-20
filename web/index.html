@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReelDrop — Free High-Speed Video & Audio Downloader</title>
+  <meta name="description" content="Download YouTube Videos, Shorts, Instagram Reels, Facebook & Snapchat videos in Full HD (1080p) & MP3. 100% Free, Fast, and No Ads." />
+  <meta name="keywords" content="youtube downloader, youtube to mp3, reel downloader, instagram reel download, facebook video download, snapchat download, reeldrop" />
+  
+  <!-- Open Graph -->
+  <meta property="og:title" content="ReelDrop — Video & MP3 Downloader" />
+  <meta property="og:description" content="Fast, 1-Click download for YouTube, Instagram, Facebook & Snapchat." />
+  <meta property="og:type" content="website" />
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z'/></svg>" type="image/svg+xml" />
+
+  <!-- Fonts & Tailwind -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #0b0f17;
+      color: #f3f4f6;
+    }
+    .glow-effect {
+      background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.22) 0%, rgba(236, 72, 153, 0.12) 35%, transparent 70%);
+    }
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(31, 41, 55, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-card:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Glow background -->
+  <div class="fixed inset-0 glow-effect pointer-events-none z-0"></div>
+
+  <!-- Navbar -->
+  <header class="sticky top-0 z-50 glass-panel border-b border-white/5">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-gray-200 to-indigo-300 bg-clip-text text-transparent">ReelDrop</span>
+          <span class="text-[10px] font-semibold text-indigo-400 tracking-wider uppercase -mt-1">Fast Downloader</span>
+        </div>
+      </a>
+
+      <!-- Telegram Bot CTA in Header -->
+      <a href="https://t.me/instareeldownloaderr_bot" target="_blank" rel="noopener noreferrer" 
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-semibold shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/35 transition-all hover:scale-[1.02] active:scale-[0.98]">
+        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+        <span>Telegram Bot</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="relative z-10 flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-10 sm:py-16">
+
+    <!-- Hero Section -->
+    <div class="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold mb-5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>100% Free · Unlimited · No Ads</span>
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight mb-4">
+        Download Videos & Music <br class="hidden sm:block" />
+        <span class="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">in Highest Quality (1080p / MP3)</span>
+      </h1>
+      <p class="text-gray-400 text-sm sm:text-base leading-relaxed">
+        Fast, clean, and unlimited video downloader for YouTube, Instagram, Facebook, and Snapchat. No registration required.
+      </p>
+    </div>
+
+    <!-- Input Box Card -->
+    <div class="max-w-2xl mx-auto mb-12">
+      <div class="glass-panel p-2.5 sm:p-3 rounded-2xl shadow-2xl shadow-black/60">
+        <form id="downloadForm" class="flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1 flex items-center">
+            <svg class="w-5 h-5 text-gray-500 absolute left-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+            <input 
+              type="text" 
+              id="urlInput" 
+              placeholder="Paste YouTube, Instagram, Facebook link here..." 
+              autocomplete="off"
+              class="w-full pl-12 pr-24 py-3.5 bg-gray-900/80 border border-gray-700/60 rounded-xl text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            />
+            <button 
+              type="button" 
+              id="pasteBtn"
+              class="absolute right-3 px-2.5 py-1 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 rounded-lg border border-indigo-500/20 transition-colors flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+              </svg>
+              <span>Paste</span>
+            </button>
+          </div>
+          <button 
+            type="submit" 
+            id="fetchBtn"
+            class="px-7 py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-bold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all flex items-center justify-center gap-2 group whitespace-nowrap">
+            <span>Get Download</span>
+            <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- Supported platform pills -->
+      <div class="flex flex-wrap items-center justify-center gap-3 mt-4 text-xs text-gray-400">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span> YouTube Videos & Shorts
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+          <span class="w-2 h-2 rounded-full bg-pink-500"></span> Instagram Reels
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span> Facebook Videos
+        </span>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/5">
+          <span class="w-2 h-2 rounded-full bg-yellow-400"></span> Snapchat
+        </span>
+      </div>
+    </div>
+
+    <!-- Video Result Card (Initially hidden or shown via URL param) -->
+    <div id="resultSection" class="hidden max-w-3xl mx-auto mb-16 transition-all duration-300">
+      <div class="glass-panel p-5 sm:p-7 rounded-2xl shadow-2xl border border-indigo-500/30">
+        
+        <!-- Video Header Info -->
+        <div class="flex flex-col sm:flex-row gap-5 items-center mb-6">
+          <div class="relative w-full sm:w-64 aspect-video rounded-xl overflow-hidden bg-gray-900 border border-white/10 shrink-0 shadow-md">
+            <img id="videoThumb" src="" alt="Thumbnail" class="w-full h-full object-cover" />
+            <div class="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-md text-[10px] font-bold text-white border border-white/10">HD</div>
+          </div>
+          <div class="flex-1 text-center sm:text-left">
+            <div class="inline-flex items-center gap-1.5 text-xs text-indigo-400 font-semibold mb-1">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+              <span id="channelName">YouTube Video</span>
+            </div>
+            <h2 id="videoTitle" class="text-base sm:text-lg font-bold text-white leading-snug line-clamp-2 mb-2">Loading video details...</h2>
+            <p class="text-xs text-gray-400">Choose your preferred quality format below to download immediately:</p>
+          </div>
+        </div>
+
+        <!-- Download Buttons Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+          <!-- 1080p -->
+          <button onclick="startDownload('1080')" class="glass-card p-4 rounded-xl flex items-center justify-between group hover:border-indigo-500/60 transition-all text-left">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">1080p</div>
+              <div>
+                <div class="text-sm font-bold text-white">Full HD Video</div>
+                <div class="text-[11px] text-gray-400">MP4 · Best Quality</div>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow flex items-center gap-1">
+              <span>Download</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </span>
+          </button>
+
+          <!-- 720p -->
+          <button onclick="startDownload('720')" class="glass-card p-4 rounded-xl flex items-center justify-between group hover:border-indigo-500/60 transition-all text-left">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs">720p</div>
+              <div>
+                <div class="text-sm font-bold text-white">HD Video</div>
+                <div class="text-[11px] text-gray-400">MP4 · Fast Download</div>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow flex items-center gap-1">
+              <span>Download</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </span>
+          </button>
+
+          <!-- 360p -->
+          <button onclick="startDownload('360')" class="glass-card p-4 rounded-xl flex items-center justify-between group hover:border-indigo-500/60 transition-all text-left">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-gray-500/10 border border-gray-500/20 flex items-center justify-center text-gray-300 font-bold text-xs">360p</div>
+              <div>
+                <div class="text-sm font-bold text-white">Standard Video</div>
+                <div class="text-[11px] text-gray-400">MP4 · Small File Size</div>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs font-semibold shadow flex items-center gap-1">
+              <span>Download</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </span>
+          </button>
+
+          <!-- MP3 Audio -->
+          <button onclick="startDownload('mp3')" class="glass-card p-4 rounded-xl flex items-center justify-between group hover:border-purple-500/60 transition-all text-left">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 font-bold text-xs">MP3</div>
+              <div>
+                <div class="text-sm font-bold text-white">Audio Only</div>
+                <div class="text-[11px] text-gray-400">MP3 · High Bitrate</div>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow flex items-center gap-1">
+              <span>Download</span>
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            </span>
+          </button>
+        </div>
+
+        <!-- Download Action Frame Container -->
+        <div id="downloadContainer" class="hidden mt-4 p-4 rounded-xl bg-gray-900/90 border border-indigo-500/30 text-center">
+          <div class="text-xs text-indigo-300 font-semibold mb-2">⚡ Processing your download:</div>
+          <iframe id="downloadFrame" class="w-full h-16 border-0 rounded-lg bg-transparent" src=""></iframe>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Official Telegram Bot Banner (Specially for Google & Direct Visitors) -->
+    <div class="max-w-4xl mx-auto mb-16">
+      <div class="relative overflow-hidden rounded-2xl p-6 sm:p-8 bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-gray-900 border border-indigo-500/30 shadow-2xl">
+        <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
+          <div class="max-w-xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold mb-3">
+              <span>🤖 Official Telegram Bot</span>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-extrabold text-white mb-2">
+              Want to download directly inside Telegram?
+            </h3>
+            <p class="text-gray-300 text-xs sm:text-sm leading-relaxed">
+              Use our official Telegram bot <strong class="text-indigo-400">@instareeldownloaderr_bot</strong>! Just send any link to the bot and get Reels, Shorts, and clips delivered straight to your chat without opening any browser.
+            </p>
+          </div>
+          <div class="shrink-0">
+            <a href="https://t.me/instareeldownloaderr_bot" target="_blank" rel="noopener noreferrer"
+               class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold text-sm shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 transition-all inline-flex items-center gap-2.5">
+              <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+              <span>Open in Telegram</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="max-w-4xl mx-auto mb-16">
+      <div class="text-center mb-8">
+        <h3 class="text-xl sm:text-2xl font-extrabold text-white">Why Use ReelDrop?</h3>
+        <p class="text-xs sm:text-sm text-gray-400 mt-1">Engineered for pure speed, zero spam, and maximum convenience.</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Feature 1 -->
+        <div class="glass-card p-5 rounded-xl text-center sm:text-left">
+          <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3 mx-auto sm:mx-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">Ultra-Fast Speeds</h4>
+          <p class="text-xs text-gray-400">High-speed stream conversion triggers downloads in seconds without queue delays.</p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="glass-card p-5 rounded-xl text-center sm:text-left">
+          <div class="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-3 mx-auto sm:mx-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">100% Safe & Private</h4>
+          <p class="text-xs text-gray-400">No account required, no login credentials stored, and no malicious redirects.</p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="glass-card p-5 rounded-xl text-center sm:text-left">
+          <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center mb-3 mx-auto sm:mx-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">Multi-Device Compatible</h4>
+          <p class="text-xs text-gray-400">Works seamlessly on Android, iPhone, Windows, Mac, and Linux browsers.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FAQ Section -->
+    <div class="max-w-3xl mx-auto mb-12">
+      <h3 class="text-lg sm:text-xl font-bold text-white mb-4 text-center">Frequently Asked Questions</h3>
+      <div class="space-y-3 text-xs sm:text-sm">
+        <div class="glass-card p-4 rounded-xl">
+          <h4 class="font-bold text-white mb-1">How to download YouTube videos on ReelDrop?</h4>
+          <p class="text-gray-400">Copy any video or Short link from YouTube, paste it into the box above, and click "Get Download". Then select your desired quality (1080p, 720p, or MP3) to download immediately.</p>
+        </div>
+        <div class="glass-card p-4 rounded-xl">
+          <h4 class="font-bold text-white mb-1">Is ReelDrop completely free?</h4>
+          <p class="text-gray-400">Yes, ReelDrop is 100% free with no hidden charges, subscriptions, or daily limits.</p>
+        </div>
+        <div class="glass-card p-4 rounded-xl">
+          <h4 class="font-bold text-white mb-1">Where are my downloaded files saved?</h4>
+          <p class="text-gray-400">Downloaded media is automatically saved in your browser's default "Downloads" folder on your phone or computer.</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-white/5 py-8 text-center text-xs text-gray-500">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-gray-300">ReelDrop</span>
+        <span>© 2026. All rights reserved.</span>
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="https://t.me/instareeldownloaderr_bot" target="_blank" class="text-indigo-400 hover:underline">Official Telegram Bot</a>
+        <a href="#downloadForm" class="hover:text-gray-400 transition-colors">Back to top ↑</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Script: URL parameter parser & auto-downloader -->
+  <script>
+    let currentVideoId = null;
+
+    function extractYouTubeId(url) {
+      if (!url) return null;
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        if (host === 'youtu.be') {
+          return parsed.pathname.slice(1).split('/')[0].split('?')[0];
+        }
+        if (host.includes('youtube.com')) {
+          if (parsed.pathname.startsWith('/shorts/')) {
+            return parsed.pathname.split('/shorts/')[1].split('/')[0].split('?')[0];
+          }
+          if (parsed.pathname.startsWith('/embed/')) {
+            return parsed.pathname.split('/embed/')[1].split('/')[0].split('?')[0];
+          }
+          return parsed.searchParams.get('v');
+        }
+      } catch (e) {
+        // Not a full URL, might be raw ID
+        if (/^[A-Za-z0-9_-]{10,12}$/.test(url.trim())) {
+          return url.trim();
+        }
+      }
+      return null;
+    }
+
+    async function loadVideoDetails(videoId) {
+      currentVideoId = videoId;
+      const resultSection = document.getElementById('resultSection');
+      const videoThumb = document.getElementById('videoThumb');
+      const videoTitle = document.getElementById('videoTitle');
+      const channelName = document.getElementById('channelName');
+
+      // Immediate reveal
+      resultSection.classList.remove('hidden');
+      videoThumb.src = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+      videoTitle.textContent = 'Fetching video information...';
+      channelName.textContent = 'YouTube Video';
+
+      // Scroll smoothly to result card
+      resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      // Fetch public oEmbed metadata
+      try {
+        const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+        if (res.ok) {
+          const data = await res.json();
+          videoTitle.textContent = data.title || 'YouTube Video';
+          channelName.textContent = data.author_name || 'YouTube Video';
+          if (data.thumbnail_url) {
+            videoThumb.src = data.thumbnail_url;
+          }
+        } else {
+          videoTitle.textContent = 'YouTube Video (' + videoId + ')';
+        }
+      } catch (err) {
+        videoTitle.textContent = 'YouTube Video Ready for Download';
+      }
+    }
+
+    function startDownload(format) {
+      if (!currentVideoId) return;
+      const container = document.getElementById('downloadContainer');
+      const frame = document.getElementById('downloadFrame');
+      
+      const fullUrl = `https://www.youtube.com/watch?v=${currentVideoId}`;
+      const encoded = encodeURIComponent(fullUrl);
+      const downloadUrl = `https://p.savenow.to/api/button/?url=${encoded}&f=${format}`;
+
+      container.classList.remove('hidden');
+      frame.src = downloadUrl;
+    }
+
+    // Auto-parse on page load (?v=... or ?url=...)
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('v') || extractYouTubeId(params.get('url'));
+
+      if (v) {
+        document.getElementById('urlInput').value = `https://www.youtube.com/watch?v=${v}`;
+        loadVideoDetails(v);
+      }
+
+      // Handle form submission
+      document.getElementById('downloadForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const inputVal = document.getElementById('urlInput').value.trim();
+        const videoId = extractYouTubeId(inputVal);
+        if (videoId) {
+          loadVideoDetails(videoId);
+        } else {
+          alert('Please enter a valid YouTube video or Short URL.');
+        }
+      });
+
+      // Handle Paste button
+      document.getElementById('pasteBtn').addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text) {
+            document.getElementById('urlInput').value = text;
+            const videoId = extractYouTubeId(text);
+            if (videoId) {
+              loadVideoDetails(videoId);
+            }
+          }
+        } catch (err) {
+          // Clipboard read not permitted
+          document.getElementById('urlInput').focus();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

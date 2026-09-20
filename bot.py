@@ -196,11 +196,16 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
             return
         encoded_yt = quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
-        keyboard = InlineKeyboardMarkup([
+        buttons = []
+        if config.WEB_DOWNLOADER_URL:
+            buttons.append([InlineKeyboardButton("🌐 ReelDrop Web (1-Click MP3)", url=f"{config.WEB_DOWNLOADER_URL}/?v={video_id}")])
+        buttons.extend([
             [InlineKeyboardButton("🚀 1-Click MP3 Download (Auto)", url=f"https://p.savenow.to/api/button/?url={encoded_yt}&f=mp3")],
             [InlineKeyboardButton("🎵 YTMP3 (Instant MP3 Converter)", url="https://ytmp3.nu/en/")],
             [InlineKeyboardButton("⚡ YT1s MP3 Studio", url="https://yt1s.com.co/en1/youtube-to-mp3/")],
         ])
+        keyboard = InlineKeyboardMarkup(buttons)
+
         await message.reply_html(
             "🎵 <b>YouTube Audio (MP3)</b>\n\n"
             "Instant MP3 download ke liye verified unblocked servers use karein:\n\n"
@@ -328,11 +333,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
             return
         encoded_yt = quote(f"https://www.youtube.com/watch?v={video_id}", safe="")
-        keyboard = InlineKeyboardMarkup([
+        buttons = []
+        if config.WEB_DOWNLOADER_URL:
+            buttons.append([InlineKeyboardButton("🌐 ReelDrop Web (1-Click HD / MP3)", url=f"{config.WEB_DOWNLOADER_URL}/?v={video_id}")])
+        buttons.extend([
             [InlineKeyboardButton("🚀 1-Click Fast Download (Auto)", url=f"https://p.savenow.to/api/button/?url={encoded_yt}&f=mp4")],
             [InlineKeyboardButton("🎬 YT1s Downloader (1080p · 720p · MP3)", url="https://yt1s.com.co/en1/")],
             [InlineKeyboardButton("🎵 YTMP3 Converter (Fast Video/Audio)", url="https://ytmp3.nu/en/")],
         ])
+        keyboard = InlineKeyboardMarkup(buttons)
+
         await message.reply_html(
             "🔴 <b>YouTube Video Ready!</b>\n\n"
             "⚡ Niche diye gaye 100% verified unblocked servers se download karein:\n\n"
