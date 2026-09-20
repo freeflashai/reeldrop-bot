@@ -130,9 +130,9 @@ def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
         "restrictfilenames": True,
         "overwrites": True,
     }
-    if config.COOKIE_FILE.exists():
+    if config.COOKIE_FILE.exists() and config.COOKIE_FILE.stat().st_size > 10:
         options["cookiefile"] = str(config.COOKIE_FILE)
-    if platform == "youtube":
+    elif platform == "youtube":
         options["extractor_args"] = {
             "youtube": {
                 "player_client": ["android_vr", "web"],
