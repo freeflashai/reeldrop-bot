@@ -6,4 +6,5 @@ __pycache__/
 *.db
 temp/*
 !temp/.gitkeep
+cookies.txt
 
