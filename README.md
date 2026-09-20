@@ -1,38 +1,53 @@
 # ReelDrop Bot
 
-ReelDrop is a completely free, unlimited Instagram downloader Telegram bot. It accepts supported public Instagram links, sends the video in Telegram, records the outcome in SQLite, and removes request files.
+ReelDrop is a completely free, unlimited multi-platform downloader Telegram bot. It accepts supported public **Instagram**, **YouTube**, **Facebook**, and **Snapchat** links, sends the video or extracted MP3 audio directly in Telegram, records analytics in SQLite, and cleans up request files automatically.
 
-## Supported Instagram Content
+## Supported Platforms & Content
 
+### 📸 Instagram
 - Public Reels (`/reel/`, `/reels/`)
-- Public video posts (`/p/`, `/tv/`)
+- Public video & carousel posts (`/p/`, `/tv/`)
 - Public, unexpired Stories (`/stories/<username>/<id>`)
 - Public, currently accessible Live URLs (`/<username>/live`)
 
-Only parsed HTTP/HTTPS URLs on `instagram.com` are accepted. The bot rejects other platforms, malformed URLs, local hosts, unsafe schemes, unsupported Instagram paths, and lookalike domains.
+### 🔴 YouTube
+- YouTube Shorts (`/shorts/<id>`)
+- Standard YouTube Videos (`/watch?v=<id>`, `/v/<id>`, `/embed/<id>`)
+- Shortlinks (`youtu.be/<id>`)
+
+### 👥 Facebook
+- Public Reels (`/reel/<id>`, `/share/r/<id>/`)
+- Facebook Watch videos (`/watch/?v=<id>`, `fb.watch/<id>/`)
+- Public Page & user video posts (`/videos/<id>`, `/share/v/<id>/`)
+
+### 👻 Snapchat
+- Public Spotlight videos (`/spotlight/<id>`)
+- Public Stories & Snaps (`story.snapchat.com/s/<id>`, `/add/<user>/story/<id>`, `/p/<id>`, `/t/<id>`)
+
+Only parsed HTTP/HTTPS URLs on authorized platform domains are accepted. The bot rejects other platforms, malformed URLs, local hosts, unsafe schemes, channel/profile/explore pages, and lookalike domains.
 
 ## Free Access
 
-All supported Instagram content is free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` only confirms that the bot is free; it never opens a payment invoice. The bot never upscales video.
+All supported content is free, downloads are unlimited, and every user receives the best available quality up to 1080p. `/upgrade` confirms that the bot is free. The bot never upscales video.
 
 ## Audio Extraction and Quality Selection
 
-- Pasting a supported Instagram link displays buttons for `360p`, `480p`, `720p`, `1080p`, and `MP3 Audio`; processing begins after a selection.
-- `/audio <Instagram link>` extracts 192 kbps MP3 audio using FFmpeg and sends it directly in Telegram.
+- Pasting a supported link displays format buttons for `360p`, `480p`, `720p`, `1080p`, `🎵 MP3 Audio`, and `📝 Copy Caption`; processing begins after a selection.
+- `/audio <link>` extracts 192 kbps MP3 audio using FFmpeg and sends it directly in Telegram.
 - `/quality 360`, `/quality 480`, `/quality 720`, or `/quality 1080` saves the user's preferred maximum video resolution.
 - `/quality` without a value shows the current setting.
 - If the selected resolution is unavailable, ReelDrop sends the best available lower/source quality and never upscales.
 
 ## Carousel, Caption, and Cache
 
-- Carousel posts automatically download every media item exposed by Instagram and send them in order.
+- Carousel posts automatically download every media item exposed by the post and send them in order.
 - `📝 Copy Caption` fetches the public post caption and sends it as copyable text, split safely when it exceeds Telegram's message limit.
 - Successful uploads store Telegram `file_id` values in SQLite by normalized URL, quality, and delivery mode. Repeated requests are served instantly without downloading the source again.
 - If Telegram rejects a stale cached `file_id`, ReelDrop automatically downloads and refreshes it.
 
 ## Public Content Limitations
 
-ReelDrop does not bypass Instagram login, private accounts, expired Stories, inaccessible Live sessions, DRM, or other access controls. No cookies or credentials are accepted or harvested. Story and Live support depends on public accessibility and yt-dlp extractor support at request time.
+ReelDrop does not bypass logins, private accounts, expired Stories, inaccessible Live sessions, DRM, or other access controls. No cookies or credentials are accepted or harvested. Content support depends on public accessibility and yt-dlp extractor support at request time. Telegram Bot API has a 50MB file size limit.
 
 ## Setup and Environment Variables
 
@@ -44,7 +59,6 @@ Required/important variables:
 - `ADMIN_TELEGRAM_ID` for `/admin`
 - `REQUIRED_CHANNEL_ID=@yourchannel` (or a numeric `-100...` ID) makes channel membership mandatory before downloads
 - `REQUIRED_CHANNEL_URL=https://t.me/yourchannel` adds the Join Channel button; for a private channel, use its invite link
-- `FREE_DAILY_LIMIT=0`, `PRO_DAILY_SOFT_LIMIT=0` are legacy compatibility settings; download-count limits are disabled
 - `MAX_CONCURRENT_DOWNLOADS=3`
 - `MAX_TELEGRAM_FILE_SIZE_MB=49`, `TEMP_FILE_MAX_AGE_HOURS=24`
 - `WEBHOOK_BASE_URL`, `WEBHOOK_SECRET_TOKEN`, and `PORT` for webhook deployments
@@ -55,35 +69,15 @@ For mandatory membership checks, add the bot as an administrator in the required
 
 ## FFmpeg
 
-FFmpeg is required when yt-dlp merges video and audio. On Windows run `winget install Gyan.FFmpeg`; on Debian/Ubuntu run `sudo apt-get update && sudo apt-get install -y ffmpeg`. Verify with `ffmpeg -version`. An executable available on `PATH` works on Windows, Render, Oracle Cloud, and Linux VPS hosts.
+FFmpeg is required when yt-dlp merges video and audio or extracts MP3. On Windows run `winget install Gyan.FFmpeg`; on Debian/Ubuntu run `sudo apt-get update && sudo apt-get install -y ffmpeg`. Verify with `ffmpeg -version`.
 
 ## Admin Analytics
 
-`/admin` shows successful totals, today's successes, registered users, and Instagram successful downloads. Failed attempts are stored but excluded. `/mystats` shows the free unlimited plan and Instagram download count.
-
-## Render Deployment
-
-The included Dockerfile installs FFmpeg. Create a private repository, deploy it as a Docker web service, set `TELEGRAM_BOT_TOKEN` and `ADMIN_TELEGRAM_ID`, and use a persistent disk for `reeldrop.db` if analytics must survive restarts. `RENDER_EXTERNAL_URL` automatically enables webhook mode.
-
-## Oracle Cloud / Linux VPS Deployment
-
-Install Python, FFmpeg, and the requirements; copy the project and `.env`; then run `python bot.py` under systemd or another supervisor. Without `WEBHOOK_BASE_URL`, polling is used. Give the service account write access to the project database and `temp/`.
-
-## Database and Temporary Files
-
-Startup safely adds missing download analytics fields and the user's `video_quality` preference without deleting records. Each job uses `temp/<user_id>/<request_uuid>/`. Video and extracted MP3 files are removed after success or any failure, and stale files are cleaned at startup.
+`/admin` shows successful totals, today's successes, registered users, and download breakdowns by platform (Instagram, YouTube, Facebook, Snapchat). `/mystats` shows the user's total and platform breakdown.
 
 ## Testing
 
-Run `python -m unittest discover -s tests -v`. Network downloads are intentionally not part of unit tests; validate representative public/authorized links manually because extractor and source availability change.
-
-## Troubleshooting
-
-- Update extractors: `python -m pip install -U yt-dlp`.
-- Confirm FFmpeg is on `PATH` if merging fails.
-- Private/login-required/restricted links are intentionally rejected.
-- Telegram file-size limits are configurable, but the Bot API ultimately controls upload acceptance.
-- On ephemeral hosts, attach persistent storage for SQLite analytics.
+Run `python -m unittest discover -s tests -v`.
 
 ## Project Tree
 
@@ -96,7 +90,10 @@ reeldrop-bot/
 ├── platforms/
 │   ├── __init__.py
 │   ├── base.py
-│   └── instagram.py
+│   ├── facebook.py
+│   ├── instagram.py
+│   ├── snapchat.py
+│   └── youtube.py
 ├── tests/test_core.py
 ├── requirements.txt
 ├── Dockerfile

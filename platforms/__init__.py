@@ -12,10 +12,25 @@ from uuid import uuid4
 import yt_dlp
 from yt_dlp.utils import DownloadError
 
+from .facebook import is_supported_facebook_url
+from .instagram import is_supported_instagram_url
+from .snapchat import is_supported_snapchat_url
+from .youtube import is_supported_youtube_url
+
 logger = logging.getLogger(__name__)
 
 PLATFORM_HOSTS = {
     "instagram": {"instagram.com", "www.instagram.com"},
+    "youtube": {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"},
+    "facebook": {"facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "fb.watch"},
+    "snapchat": {"snapchat.com", "www.snapchat.com", "story.snapchat.com"},
+}
+
+PLATFORM_VALIDATORS = {
+    "instagram": is_supported_instagram_url,
+    "youtube": is_supported_youtube_url,
+    "facebook": is_supported_facebook_url,
+    "snapchat": is_supported_snapchat_url,
 }
 
 
@@ -74,6 +89,17 @@ def detect_platform(url: str) -> str:
     return "unsupported"
 
 
+def is_supported_url(url: str, platform: str | None = None) -> tuple[bool, str]:
+    """Validate if the URL belongs to a supported platform and path."""
+    detected = platform if (platform and platform != "unsupported") else detect_platform(url)
+    if detected == "unsupported":
+        return False, "unsupported"
+    validator = PLATFORM_VALIDATORS.get(detected)
+    if validator and validator(url):
+        return True, detected
+    return False, "unsupported"
+
+
 def extract_url(text: str) -> str | None:
     for candidate in re.findall(r"https?://[^\s<>]+", text, flags=re.IGNORECASE):
         cleaned = candidate.rstrip(".,);]}>'\"")
@@ -99,9 +125,7 @@ def download_video(url: str, platform: str, quality_limit: int, temp_root: Path,
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
     options = {
-        # Some direct Instagram formats omit height metadata. Prefer capped
-        # formats, then fall back to the original MP4/source without upscaling.
-        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
+        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality_limit}]+bestaudio/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
         "outtmpl": str(request_dir / "video.%(ext)s"),
         "merge_output_format": "mp4",
         "noplaylist": True,
@@ -138,11 +162,12 @@ def download_media_collection(url: str, platform: str, quality_limit: int, temp_
         raise UnsupportedUrlError("Unsupported URL")
     request_dir = temp_root / str(user_id) / uuid4().hex
     request_dir.mkdir(parents=True, exist_ok=False)
+    noplaylist = (platform != "instagram")
     options = {
-        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
+        "format": f"bestvideo[height<={quality_limit}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={quality_limit}]+bestaudio/best[height<={quality_limit}][ext=mp4]/best[height<={quality_limit}]/best[ext=mp4]/best",
         "outtmpl": str(request_dir / "%(playlist_index|0)03d_%(id)s.%(ext)s"),
         "merge_output_format": "mp4",
-        "noplaylist": False,
+        "noplaylist": noplaylist,
         "quiet": True,
         "no_warnings": True,
         "restrictfilenames": True,
@@ -175,7 +200,8 @@ def get_metadata(url: str, platform: str) -> dict:
     if platform not in PLATFORM_HOSTS or detect_platform(url) != platform:
         raise UnsupportedUrlError("Unsupported URL")
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": False}) as ydl:
+        noplaylist = (platform != "instagram")
+        with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": noplaylist}) as ydl:
             info = ydl.extract_info(url, download=False)
         entries = info.get("entries") or []
         first = next((entry for entry in entries if entry), info)

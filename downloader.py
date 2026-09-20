@@ -15,8 +15,12 @@ from platforms import (  # noqa: F401
     download_video,
     extract_url,
     get_metadata,
+    is_supported_url,
 )
+from platforms.facebook import is_supported_facebook_url
 from platforms.instagram import extract_instagram_url, is_supported_instagram_url
+from platforms.snapchat import is_supported_snapchat_url
+from platforms.youtube import is_supported_youtube_url
 
 
 class UnsupportedInstagramUrlError(UnsupportedUrlError):
