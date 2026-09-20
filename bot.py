@@ -14,7 +14,8 @@ from database import Database, PLATFORMS
 from downloader import (PrivateOrInaccessibleError, ReelDownloadError,
                         UnsupportedUrlError, VideoUnavailableError,
                         cleanup_old_temp_files, delete_request_files, detect_platform, download_audio,
-                        download_media_collection, extract_url, get_metadata, is_supported_url)
+                        download_media_collection, extract_url, extract_youtube_video_id, get_metadata, is_supported_url)
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
@@ -35,9 +36,10 @@ WELCOME_TEXT = """👋 Welcome to ReelDrop
 📸 Instagram · 🔴 YouTube · 👥 Facebook · 👻 Snapchat
 
 🎬 Instagram Reels, Video posts, Stories & Live
-🔴 YouTube Shorts & Videos
+🔴 YouTube Shorts & Videos (Fast 1-Click Download)
 👥 Facebook Reels & Watch videos
 👻 Snapchat Spotlight & Stories
+
 
 🎵 /audio <link> — MP3 nikalein
 ⚙️ /quality 360|480|720|1080
@@ -187,7 +189,26 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await message.reply_text("❌ Use: /audio <supported link (Instagram, YouTube, Facebook, Snapchat)>")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
+    if platform == "youtube":
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
+            return
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚡ Fast Download MP3 / Video", url=f"https://www.y2mate.com/youtube/{video_id}")],
+            [InlineKeyboardButton("📥 Alternative Server (SaveFrom)", url=f"https://ssyoutube.com/watch?v={video_id}")],
+            [InlineKeyboardButton("✨ Cobalt Downloader (No Ads)", url="https://cobalt.tools/")],
+        ])
+        await message.reply_text(
+            "🎵 YouTube Audio (MP3)\n\n"
+            "Instant MP3 download ke liye niche diye kisi bhi button par tap karein:\n\n"
+            "👇 Click button to download:",
+            reply_markup=keyboard,
+        )
+        await asyncio.to_thread(database.record_download, user_id, "success", "youtube", None, "free")
+        return
     cache_key = _cache_key(url, "audio:mp3:192")
+
     cached = await asyncio.to_thread(database.get_cached_media, cache_key)
     if cached and await _send_cached(message, cached, f"✅ Audio Download Complete\n\n🎵 {platform_name} Audio · instant cache"):
         await asyncio.to_thread(database.record_download, user_id, "success", platform, None, "free")
@@ -292,7 +313,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await message.reply_text("❌ Sirf supported Instagram, YouTube, Facebook ya Snapchat link bhejein.")
         return
     platform_name = PLATFORM_NAMES.get(platform, platform.title())
+    if platform == "youtube":
+        video_id = extract_youtube_video_id(url)
+        if not video_id:
+            await message.reply_text("❌ YouTube video ID pehchan nahi paya. Kripya valid YouTube video ya Short link bhejein.")
+            return
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚡ Fast Download (1080p/720p/MP3)", url=f"https://www.y2mate.com/youtube/{video_id}")],
+            [InlineKeyboardButton("📥 Alternative Server (SaveFrom)", url=f"https://ssyoutube.com/watch?v={video_id}")],
+            [InlineKeyboardButton("✨ Cobalt Downloader (No Ads)", url="https://cobalt.tools/")],
+        ])
+        await message.reply_text(
+            "🔴 YouTube Video Ready!\n\n"
+            "⚡ Direct fast download ke liye niche diye kisi bhi button par tap karein:\n"
+            "• 🎬 1080p, 720p HD Video & 🎵 MP3 Audio\n"
+            "• ⚡ High-speed direct download\n"
+            "• 📱 Telegram ki 50MB limit bypass!\n\n"
+            "👇 Choose download server:",
+            reply_markup=keyboard,
+        )
+        await asyncio.to_thread(database.record_download, user_id, "success", "youtube", 1080, "free")
+        return
     if not context.user_data.pop("choice_confirmed", False):
+
         context.user_data["pending_url"] = url
         context.user_data["pending_platform"] = platform
         keyboard = InlineKeyboardMarkup([

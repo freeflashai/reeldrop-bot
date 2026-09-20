@@ -37,3 +37,29 @@ def is_supported_youtube_url(url: str) -> bool:
         return bool(video_ids and re.fullmatch(r"[A-Za-z0-9_-]{6,}", video_ids[0]))
 
     return False
+
+
+def extract_youtube_video_id(url: str) -> str | None:
+    """Extract YouTube video identifier from Short, Watch, or youtu.be URL."""
+    try:
+        parsed = urlparse(url)
+    except (ValueError, UnicodeError):
+        return None
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if host == "youtu.be":
+        path = parsed.path.strip("/")
+        if path:
+            return path.split("/")[0].split("?")[0]
+        return None
+    if host in YOUTUBE_HOSTS:
+        path = parsed.path.rstrip("/")
+        for prefix in ("/shorts/", "/embed/", "/v/"):
+            if path.startswith(prefix):
+                parts = path.split(prefix)[1].split("/")
+                return parts[0].split("?")[0] if parts else None
+        qs = parse_qs(parsed.query)
+        v = qs.get("v")
+        if v and v[0]:
+            return v[0]
+    return None
+

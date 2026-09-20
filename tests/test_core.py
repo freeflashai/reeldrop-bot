@@ -7,7 +7,8 @@ from database import Database
 from downloader import cleanup_old_temp_files, delete_request_files, detect_platform, extract_url, is_supported_url
 from platforms import ReelDownloadError, VideoUnavailableError, _classify_error
 from platforms.instagram import is_supported_instagram_url
-from platforms.youtube import is_supported_youtube_url
+from platforms.youtube import extract_youtube_video_id, is_supported_youtube_url
+
 from platforms.facebook import is_supported_facebook_url
 from platforms.snapchat import is_supported_snapchat_url
 from bot import _has_channel_access, _cache_key
@@ -73,6 +74,21 @@ class PlatformTests(unittest.TestCase):
             valid, platform = is_supported_url(url)
             self.assertTrue(valid)
             self.assertEqual(platform, "youtube")
+
+    def test_extract_youtube_video_id(self):
+        cases = {
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://m.youtube.com/watch?v=dQw4w9WgXcQ&feature=share": "dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ?si=12345": "dQw4w9WgXcQ",
+            "https://youtube.com/shorts/123456abcdef": "123456abcdef",
+            "https://youtube.com/shorts/123456abcdef?feature=share": "123456abcdef",
+            "https://www.youtube.com/embed/dQw4w9WgXcQ": "dQw4w9WgXcQ",
+            "https://instagram.com/reel/123456": None,
+        }
+        for url, expected in cases.items():
+            self.assertEqual(extract_youtube_video_id(url), expected, url)
+
 
     def test_supported_facebook_content_paths(self):
         urls = (

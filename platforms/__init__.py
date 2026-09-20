@@ -17,7 +17,8 @@ import config
 from .facebook import is_supported_facebook_url
 from .instagram import is_supported_instagram_url
 from .snapchat import is_supported_snapchat_url
-from .youtube import is_supported_youtube_url
+from .youtube import extract_youtube_video_id, is_supported_youtube_url
+
 
 logger = logging.getLogger(__name__)
 
