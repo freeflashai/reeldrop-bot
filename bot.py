@@ -2,7 +2,12 @@
 
 import asyncio
 import hashlib
+import html
 import logging
+import re
+import shutil
+import time
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
@@ -33,29 +38,21 @@ PLATFORM_NAMES = {
 }
 
 WELCOME_TEXT = """👋 Welcome to ReelDrop
-
+ 
 📸 Instagram · 🔴 YouTube · 👥 Facebook · 👻 Snapchat
-
+ 
 🎬 Instagram Reels, Video posts, Stories & Live
 🔴 YouTube Shorts & Videos (360p, 480p, 720p, 1080p & MP3)
 👥 Facebook Reels & Watch videos
 👻 Snapchat Spotlight & Stories
-
-
+ 
 🎵 /audio <link> — MP3 nikalein
 ⚙️ /quality 360|480|720|1080
-
-🔗 Bas supported video link bhejo.
-🎬 Best available quality me video directly Telegram par pao.
-
-✅ Free to use & Unlimited
-🔒 Simple & privacy-conscious
-⚡ Fast processing
-📱 Directly on Telegram
-
-Private, login-required ya restricted content process nahi hota.
-
-Just paste the link 👇"""
+ 
+📊 Live download progress percentage (%)
+💾 50MB+ large files & Full HD videos seedhe laptop me save hote hain!
+ 
+🔗 Bas supported video link bhejo 👇"""
 
 
 def _has_channel_access(member) -> bool:
@@ -132,6 +129,121 @@ def _telegram_file_id(sent, file_type: str) -> str:
     return sent.document.file_id
 
 
+def _format_bytes(bytes_count: int | float | None) -> str:
+    if not bytes_count or bytes_count <= 0:
+        return "0 B"
+    num = float(bytes_count)
+    for unit in ("B", "KB", "MB", "GB"):
+        if num < 1024.0:
+            return f"{num:.1f} {unit}" if unit != "B" else f"{int(num)} B"
+        num /= 1024.0
+    return f"{num:.1f} TB"
+
+
+def _safe_filename(title: str | None, default_name: str, ext: str) -> str:
+    if not title:
+        raw_name = default_name
+    else:
+        raw_name = re.sub(r'[\\/*?:"<>|]', "", title).strip()
+        if not raw_name:
+            raw_name = default_name
+    raw_name = raw_name[:80].strip()
+    if not ext.startswith("."):
+        ext = f".{ext}"
+    return f"{raw_name}{ext}"
+
+
+def _get_unique_filepath(dest_dir: Path, filename: str) -> Path:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    target = dest_dir / filename
+    if not target.exists():
+        return target
+    stem = target.stem
+    suffix = target.suffix
+    counter = 1
+    while True:
+        candidate = dest_dir / f"{stem}_{counter}{suffix}"
+        if not candidate.exists():
+            return candidate
+        counter += 1
+
+
+class TelegramProgressTracker:
+    """Thread-safe progress reporter that updates a Telegram status message."""
+
+    def __init__(self, message, header: str = "⏳ Processing..."):
+        self.message = message
+        self.header = header
+        self.last_update_time = 0.0
+        self.last_text = ""
+        self.loop = asyncio.get_running_loop()
+
+    def hook(self, d: dict) -> None:
+        status = d.get("status")
+        if status == "downloading":
+            now = time.time()
+            downloaded = d.get("downloaded_bytes") or 0
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+
+            percent = (downloaded / total * 100) if total > 0 else 0
+            percent_clamped = min(100.0, max(0.0, percent))
+
+            # Rate limit Telegram edits: at most once every 2 seconds, unless at 100%
+            if now - self.last_update_time < 2.0 and percent_clamped < 99.5:
+                return
+
+            self.last_update_time = now
+            speed = d.get("speed")
+            eta = d.get("eta")
+            speed_str = f"{_format_bytes(speed)}/s" if speed else "N/A"
+            eta_str = f"{int(eta)}s" if eta is not None else "..."
+            dl_str = _format_bytes(downloaded)
+
+            if total > 0:
+                blocks = int(percent_clamped // 10)
+                bar = "█" * blocks + "░" * (10 - blocks)
+                total_str = _format_bytes(total)
+                text = (
+                    f"{self.header}\n\n"
+                    f"📥 <b>Downloading: {percent_clamped:.0f}%</b>\n"
+                    f"<code>[{bar}]</code>\n"
+                    f"⚡ <b>Speed:</b> {speed_str} · ⏱ <b>ETA:</b> {eta_str}\n"
+                    f"📦 <b>Size:</b> {dl_str} / {total_str}"
+                )
+            else:
+                text = (
+                    f"{self.header}\n\n"
+                    f"📥 <b>Downloading...</b>\n"
+                    f"⚡ <b>Speed:</b> {speed_str}\n"
+                    f"📦 <b>Downloaded:</b> {dl_str}"
+                )
+
+            try:
+                asyncio.run_coroutine_threadsafe(self._safe_edit(text), self.loop)
+            except Exception:
+                pass
+
+        elif status == "finished":
+            now = time.time()
+            if now - self.last_update_time >= 1.5:
+                self.last_update_time = now
+                text = f"{self.header}\n\n📥 <b>Download 100% complete!</b>\n⚙️ Media process ho rahi hai..."
+                try:
+                    asyncio.run_coroutine_threadsafe(self._safe_edit(text), self.loop)
+                except Exception:
+                    pass
+
+    async def _safe_edit(self, text: str) -> None:
+        if text == self.last_text:
+            return
+        self.last_text = text
+        try:
+            await self.message.edit_text(text, parse_mode="HTML")
+        except (BadRequest, TelegramError):
+            pass
+
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user:
         await asyncio.to_thread(database.ensure_user, update.effective_user.id)
@@ -196,15 +308,30 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if cached and await _send_cached(message, cached, f"✅ Audio Download Complete\n\n🎵 {platform_name} Audio · instant cache"):
         await asyncio.to_thread(database.record_download, user_id, "success", platform, None, "free")
         return
-    status = await message.reply_text(f"🎵 {platform_name} audio extract ho rahi hai...")
+    status = await message.reply_text(f"🎵 <b>{platform_name}</b> audio extract ho rahi hai...", parse_mode="HTML")
+    progress = TelegramProgressTracker(status, f"🎵 <b>{platform_name} Audio</b>")
     request_dir = None
     try:
         async with download_semaphore:
-            result = await asyncio.to_thread(download_audio, url, platform, config.TEMP_DIR, user_id)
+            result = await asyncio.to_thread(download_audio, url, platform, config.TEMP_DIR, user_id, progress.hook)
             request_dir = result.request_dir
         if result.path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
             size_mb = round(result.path.stat().st_size / (1024 * 1024), 1)
-            raise ReelDownloadError(f"Audio file size ({size_mb}MB) Telegram limit (50MB) se badi hai.")
+            safe_name = _safe_filename(result.title, f"{platform}_audio", result.path.suffix)
+            dest_path = _get_unique_filepath(config.DOWNLOADS_DIR, safe_name)
+            shutil.copy2(result.path, dest_path)
+            title_esc = html.escape(result.title or f"{platform_name} Audio")
+            path_str = html.escape(str(dest_path.resolve()))
+            await status.edit_text(
+                f"💾 <b>Large Audio Saved Directly on Laptop!</b>\n\n"
+                f"🎵 <b>Title:</b> {title_esc}\n"
+                f"📦 <b>Size:</b> {size_mb} MB\n"
+                f"📁 <b>Saved Location:</b>\n<code>{path_str}</code>\n\n"
+                f"⚠️ <i>Audio file 50MB se badi hai, isliye Telegram par bhejne ki jagah direct aapke laptop ke downloads folder me save kar di gayi hai!</i>",
+                parse_mode="HTML",
+            )
+            await asyncio.to_thread(database.record_download, user_id, "success", platform, None, "free")
+            return
         await status.edit_text("📤 Telegram par upload ho rahi hai...")
         with result.path.open("rb") as audio_file:
             sent = await message.reply_audio(
@@ -302,34 +429,80 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data["pending_platform"] = platform
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("360p", callback_data="media:360"), InlineKeyboardButton("480p", callback_data="media:480")],
-            [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p", callback_data="media:1080")],
+            [InlineKeyboardButton("720p", callback_data="media:720"), InlineKeyboardButton("1080p (Full HD)", callback_data="media:1080")],
+            [InlineKeyboardButton("💾 Save to Laptop (Full HD / No 50MB Limit)", callback_data="media:laptop")],
             [InlineKeyboardButton("🎵 MP3 Audio", callback_data="media:audio")],
             [InlineKeyboardButton("📝 Copy Caption", callback_data="media:caption")],
         ])
         await message.reply_text(f"🎬 {platform_name} detected! Format choose karein:", reply_markup=keyboard)
         return
+    save_to_laptop = context.user_data.pop("save_to_laptop", False)
     plan = "free"
-    quality = context.user_data.pop("selected_quality", None) or await asyncio.to_thread(database.get_video_quality, user_id)
-    await asyncio.to_thread(database.set_video_quality, user_id, quality)
-    cache_key = _cache_key(url, f"video:{quality}")
-    cached = await asyncio.to_thread(database.get_cached_media, cache_key)
-    cached_caption = f"✅ Download Complete\n\n🎬 {platform_name} · up to {quality}p\n⚡ ReelDrop · instant cache"
-    if cached and await _send_cached(message, cached, cached_caption):
-        await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
-        return
-    status = await message.reply_text(f"🔍 {platform_name} detected · {quality}p tak\n\n⏳ Video process ho rahi hai...")
+    quality = context.user_data.pop("selected_quality", None)
+    if not quality and not save_to_laptop:
+        quality = await asyncio.to_thread(database.get_video_quality, user_id)
+    if quality:
+        await asyncio.to_thread(database.set_video_quality, user_id, quality)
+
+    cache_key = _cache_key(url, f"video:{quality or 'laptop'}")
+    if not save_to_laptop:
+        cached = await asyncio.to_thread(database.get_cached_media, cache_key)
+        cached_caption = f"✅ Download Complete\n\n🎬 {platform_name} · up to {quality}p\n⚡ ReelDrop · instant cache"
+        if cached and await _send_cached(message, cached, cached_caption):
+            await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
+            return
+
+    quality_display = f"{quality}p tak" if quality else "Best Quality (No 50MB Limit)"
+    status = await message.reply_text(
+        f"🔍 <b>{platform_name}</b> detected · {quality_display}\n\n⏳ Video process ho rahi hai...",
+        parse_mode="HTML",
+    )
+    progress = TelegramProgressTracker(status, f"🎬 <b>{platform_name}</b> ({quality_display})")
     request_dir = None
     try:
         async with download_semaphore:
-            result = await asyncio.to_thread(download_media_collection, url, platform, quality, config.TEMP_DIR, user_id)
+            result = await asyncio.to_thread(
+                download_media_collection, url, platform, quality, config.TEMP_DIR, user_id, progress.hook
+            )
             request_dir = result.request_dir
+
+        has_oversized = any(p.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES for p in result.paths)
+        if save_to_laptop or has_oversized:
+            saved_details = []
+            for index, path in enumerate(result.paths):
+                size_mb = round(path.stat().st_size / (1024 * 1024), 1)
+                default_name = f"{platform}_item_{index + 1}" if len(result.paths) > 1 else f"{platform}_video"
+                safe_name = _safe_filename(result.title, default_name, path.suffix)
+                dest_path = _get_unique_filepath(config.DOWNLOADS_DIR, safe_name)
+                shutil.copy2(path, dest_path)
+                saved_details.append((dest_path, size_mb))
+
+            total_size_mb = round(sum(size for _, size in saved_details), 1)
+            paths_formatted = "\n".join(f"<code>{html.escape(str(p.resolve()))}</code>" for p, _ in saved_details)
+            title_esc = html.escape(result.title or f"{platform_name} Video")
+
+            if save_to_laptop:
+                reason = "⚡ <i>Direct laptop save select kiya gaya tha (Full HD / No 50MB Limit).</i>"
+            else:
+                reason = "⚠️ <i>Video size Telegram limit (50MB) se badi hone ke karan direct aapke laptop ke downloads folder mein save kar di gayi hai!</i>"
+
+            saved_msg = (
+                f"💾 <b>File Saved Directly on Laptop!</b>\n\n"
+                f"🎬 <b>Title:</b> {title_esc}\n"
+                f"📦 <b>Total Size:</b> {total_size_mb} MB\n"
+                f"📁 <b>Saved Location:</b>\n{paths_formatted}\n\n"
+                f"{reason}\n\n"
+                f"✅ File aapke computer ke <b>downloads</b> folder me safely available hai!"
+            )
+            await status.edit_text(saved_msg, parse_mode="HTML")
+            await asyncio.to_thread(database.record_download, user_id, "success", platform, quality, plan)
+            return
+
         await status.edit_text("📤 Telegram par upload ho raha hai...")
         uploaded = []
         total_items = len(result.paths)
         for index, path in enumerate(result.paths):
             size_mb = round(path.stat().st_size / (1024 * 1024), 1)
-            if path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
-                raise ReelDownloadError(f"Video size ({size_mb}MB) Telegram limit (50MB) se badi hai. Kripya lower quality (480p ya 360p) choose karein.")
             suffix = path.suffix.lower()
             is_photo = suffix in {".jpg", ".jpeg", ".png", ".webp"}
             file_type = "photo" if is_photo else "video"
@@ -385,11 +558,21 @@ async def media_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await query.edit_message_text("⌛ Ye selection expire ho gayi. Video link dobara bhejein.")
         return
     choice = (query.data or "").removeprefix("media:")
-    labels = {"audio": "MP3 Audio", "caption": "Caption"}
+    labels = {
+        "audio": "MP3 Audio",
+        "caption": "Caption",
+        "laptop": "Save to Laptop (Full HD)",
+    }
     await query.edit_message_text(f"✅ {labels.get(choice, choice + 'p')} selected")
     context.user_data["selected_url"] = url
     if choice == "audio":
         await audio_command(update, context)
+        return
+    if choice == "laptop":
+        context.user_data["save_to_laptop"] = True
+        context.user_data["selected_quality"] = 1080
+        context.user_data["choice_confirmed"] = True
+        await handle_message(update, context)
         return
     if choice == "caption":
         context.user_data.pop("selected_url", None)
@@ -435,7 +618,7 @@ def build_bot_app() -> Application:
         ("admin", admin),
     ):
         app.add_handler(CommandHandler(command, callback))
-    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|audio|caption)$"))
+    app.add_handler(CallbackQueryHandler(media_choice, pattern=r"^media:(?:360|480|720|1080|laptop|audio|caption)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_error_handler(error_handler)
     return app

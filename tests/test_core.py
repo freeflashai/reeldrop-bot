@@ -187,4 +187,41 @@ class DatabaseTests(unittest.TestCase):
             cleanup_old_temp_files(Path(folder), 24)
 
 
+class ProgressAndStorageTests(unittest.TestCase):
+    def test_format_bytes(self):
+        from bot import _format_bytes
+        self.assertEqual(_format_bytes(0), "0 B")
+        self.assertEqual(_format_bytes(500), "500 B")
+        self.assertEqual(_format_bytes(1024), "1.0 KB")
+        self.assertEqual(_format_bytes(5 * 1024 * 1024), "5.0 MB")
+        self.assertEqual(_format_bytes(2 * 1024 * 1024 * 1024), "2.0 GB")
+
+    def test_safe_filename(self):
+        from bot import _safe_filename
+        self.assertEqual(_safe_filename(None, "default", "mp4"), "default.mp4")
+        self.assertEqual(_safe_filename('My: Cool "Video" / Reel?', "default", ".mp4"), "My Cool Video  Reel.mp4")
+        self.assertEqual(_safe_filename("", "default", "mp3"), "default.mp3")
+
+    def test_unique_filepath(self):
+        from bot import _get_unique_filepath
+        with tempfile.TemporaryDirectory() as folder:
+            dest = Path(folder)
+            p1 = _get_unique_filepath(dest, "video.mp4")
+            self.assertEqual(p1.name, "video.mp4")
+            p1.write_bytes(b"1")
+            p2 = _get_unique_filepath(dest, "video.mp4")
+            self.assertEqual(p2.name, "video_1.mp4")
+            p2.write_bytes(b"2")
+            p3 = _get_unique_filepath(dest, "video.mp4")
+            self.assertEqual(p3.name, "video_2.mp4")
+
+    def test_callback_patterns(self):
+        import re
+        pattern = r"^media:(?:360|480|720|1080|laptop|audio|caption)$"
+        for choice in ("media:360", "media:480", "media:720", "media:1080", "media:laptop", "media:audio", "media:caption"):
+            self.assertTrue(bool(re.match(pattern, choice)), f"Failed to match: {choice}")
+        self.assertFalse(bool(re.match(pattern, "media:invalid")))
+
+
 if __name__ == "__main__": unittest.main()
+
