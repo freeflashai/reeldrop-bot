@@ -199,7 +199,8 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             result = await asyncio.to_thread(download_audio, url, platform, config.TEMP_DIR, user_id)
             request_dir = result.request_dir
         if result.path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
-            raise ReelDownloadError("Telegram file size limit exceeded")
+            size_mb = round(result.path.stat().st_size / (1024 * 1024), 1)
+            raise ReelDownloadError(f"Audio file size ({size_mb}MB) Telegram limit (50MB) se badi hai.")
         await status.edit_text("📤 Telegram par upload ho rahi hai...")
         with result.path.open("rb") as audio_file:
             sent = await message.reply_audio(
@@ -221,10 +222,20 @@ async def audio_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     except VideoUnavailableError:
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, None, "free")
         await status.edit_text("❌ Video available nahi hai ya remove ho chuki hai.")
-    except (NetworkError, TelegramError, ReelDownloadError, UnsupportedUrlError):
-        logger.exception("Audio processing failed for user %s on %s", user_id, platform)
+    except ReelDownloadError as error:
+        logger.exception("Audio download failed for user %s on %s: %s", user_id, platform, error)
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, None, "free")
-        try: await status.edit_text("⚠️ Audio extract nahi ho payi. Thodi der baad dobara try karein.")
+        try: await status.edit_text(f"⚠️ {str(error)}")
+        except TelegramError: pass
+    except (NetworkError, TelegramError):
+        logger.exception("Audio upload failed for user %s on %s", user_id, platform)
+        await asyncio.to_thread(database.record_download, user_id, "failed", platform, None, "free")
+        try: await status.edit_text("⚠️ Audio upload timeout ho gaya. Kripya dobara try karein.")
+        except TelegramError: pass
+    except Exception as error:
+        logger.exception("Unexpected audio failure for user %s on %s", user_id, platform)
+        await asyncio.to_thread(database.record_download, user_id, "failed", platform, None, "free")
+        try: await status.edit_text(f"⚠️ Audio extract nahi ho payi: {str(error)[:100]}")
         except TelegramError: pass
     finally:
         await asyncio.to_thread(delete_request_files, request_dir)
@@ -311,8 +322,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         uploaded = []
         total_items = len(result.paths)
         for index, path in enumerate(result.paths):
+            size_mb = round(path.stat().st_size / (1024 * 1024), 1)
             if path.stat().st_size > config.MAX_TELEGRAM_FILE_SIZE_BYTES:
-                raise ReelDownloadError("Telegram file size limit exceeded (max 49MB)")
+                raise ReelDownloadError(f"Video size ({size_mb}MB) Telegram limit (50MB) se badi hai. Kripya lower quality (480p ya 360p) choose karein.")
             suffix = path.suffix.lower()
             is_photo = suffix in {".jpg", ".jpeg", ".png", ".webp"}
             file_type = "photo" if is_photo else "video"
@@ -336,15 +348,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except VideoUnavailableError:
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
         await status.edit_text("❌ Video available nahi hai ya remove ho chuki hai.")
-    except (NetworkError, TelegramError, ReelDownloadError, UnsupportedUrlError):
-        logger.exception("Processing failed for user %s on %s", user_id, platform)
+    except ReelDownloadError as error:
+        logger.exception("Download failed for user %s on %s: %s", user_id, platform, error)
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
-        try: await status.edit_text("⚠️ Video process nahi ho payi. Thodi der baad dobara try karein.")
+        try: await status.edit_text(f"⚠️ {str(error)}")
         except TelegramError: pass
-    except Exception:
+    except (NetworkError, TelegramError) as error:
+        logger.exception("Telegram upload failed for user %s on %s", user_id, platform)
+        await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
+        try: await status.edit_text("⚠️ Telegram upload timeout ho gaya. Kripya lower quality (480p ya 360p) try karein.")
+        except TelegramError: pass
+    except Exception as error:
         logger.exception("Unexpected processing failure for user %s on %s", user_id, platform)
         await asyncio.to_thread(database.record_download, user_id, "failed", platform, quality, plan)
-        try: await status.edit_text("⚠️ Video process nahi ho payi. Thodi der baad dobara try karein.")
+        try: await status.edit_text(f"⚠️ Video process nahi ho payi: {str(error)[:100]}")
         except TelegramError: pass
     finally:
         await asyncio.to_thread(delete_request_files, request_dir)
