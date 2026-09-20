@@ -133,13 +133,7 @@ def _get_ydl_options(platform: str, extra: dict | None = None) -> dict:
     }
     if config.COOKIE_FILE.exists() and config.COOKIE_FILE.stat().st_size > 10:
         options["cookiefile"] = str(config.COOKIE_FILE)
-        if platform == "youtube":
-            options["extractor_args"] = {
-                "youtube": {
-                    "player_client": ["web", "android"],
-                }
-            }
-    elif platform == "youtube":
+    if platform == "youtube":
         options["extractor_args"] = {
             "youtube": {
                 "player_client": ["android"],
