@@ -7,4 +7,6 @@ __pycache__/
 temp/*
 !temp/.gitkeep
 cookies.txt
+web/.firebase/
+
 

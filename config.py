@@ -40,6 +40,7 @@ YOUTUBE_COOKIES = os.getenv("YOUTUBE_COOKIES", "").strip()
 if YOUTUBE_COOKIES:
     COOKIE_FILE.write_text(YOUTUBE_COOKIES, encoding="utf-8")
 
-WEB_DOWNLOADER_URL = os.getenv("WEB_DOWNLOADER_URL", "").strip().rstrip("/")
+WEB_DOWNLOADER_URL = os.getenv("WEB_DOWNLOADER_URL", "https://reel-drop-downloder.web.app").strip().rstrip("/")
+
 
 
